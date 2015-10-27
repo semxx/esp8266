@@ -7,6 +7,9 @@
 #define ONE_WIRE_BUS 12  //Data wire plugged to pin 12 (temp sensor)
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
+
+const char* server = "api.thingspeak.com";
+String apiKey = "VQ0584HOI2VHUYSH";
 char auth[] = "77804dfb38444bb381b9bd01145af4f3";
 
 //Auth Tokens for any additional projects
@@ -17,10 +20,8 @@ WidgetLED led1(0);
 //WidgetLED led2(1);
 
 // Thingspeak code part I
-const char* server = "api.thingspeak.com";
-String apiKey = "VQ0584HOI2VHUYSH";
+
 WiFiClient client;
- 
 SimpleTimer timer;
  
 void setup()
