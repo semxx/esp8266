@@ -1,3 +1,4 @@
+// http://community.blynk.cc/t/button-timer/1449
 bool enableTimer = 0; // Defaults to disable timer (button on vPin 3)
 bool timerLights; // Defaults to timer is running (timer widget on vPin 4)
 
