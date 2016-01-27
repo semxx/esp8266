@@ -78,8 +78,8 @@ void setup()
   pinMode(Pin, INPUT_PULLUP);
   pinMode(Pin2, INPUT_PULLUP);
  
-  attachInterrupt(Pin, coldimpulse, FALLING);
-  attachInterrupt(Pin2, hotimpulse, FALLING);
+//  attachInterrupt(Pin, coldimpulse, FALLING);
+//  attachInterrupt(Pin2, hotimpulse, FALLING);
   delay(50);
 	
   Blynk.begin(auth, "Mimimi", "panatorium");
