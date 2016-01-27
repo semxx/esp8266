@@ -19,14 +19,14 @@ TelegramBOT bot(BOTtoken, BOTname, BOTusername);
 /////////////////////////
 // Network Definitions //
 /////////////////////////
-const IPAddress AP_IP(10, 10, 10, 21);
-const char* AP_SSID = "ESP8266_IOT_BUTTON_SETUP";
+
 boolean SETUP_MODE;
 String SSID_LIST;
 
 /////////////////////////
 // Time Definitions //
 /////////////////////////
+
 char timeString[8];
 
 /////////////////////
@@ -38,6 +38,7 @@ const int BUTTON_PIN = 5;
 //////////////////////
 // Button Variables //
 //////////////////////
+
 int BUTTON_STATE;
 int LAST_BUTTON_STATE = LOW;
 long LAST_DEBOUNCE_TIME = 0;
@@ -65,7 +66,6 @@ void setup() {
 }
 
 void loop() {
-
 
   // Wait for button Presses
   boolean pressed = debounce();
