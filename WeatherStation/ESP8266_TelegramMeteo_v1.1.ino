@@ -81,7 +81,7 @@ void setup()
 //  attachInterrupt(Pin, coldimpulse, FALLING);
 //  attachInterrupt(Pin2, hotimpulse, FALLING);
   delay(50);
-	
+  
   Blynk.begin(auth, "Mimimi", "panatorium");
 
   while (Blynk.connect() == false) {
@@ -92,13 +92,12 @@ void setup()
 // pinMode(2, OUTPUT); // initialize digital pin 13 as an output. 
    bridge1.setAuthToken(auth1);
 
-   timer.setInterval(60000L, current_time);
-   timer.setInterval(15000L, dhtRead);
-   timer.setInterval(15000L, readDallas);
+   timer.setInterval(75000L, current_time);
+   timer.setInterval(45000L, dhtRead);
+   timer.setInterval(40000L, readDallas);
    timer.setInterval(60000L, sendThingSpeak);
    timer.setInterval(10000L, TelegramCheck);
-   timer.setInterval(20000L, GetPressure);
-// timer.setInterval(5000L, Bot_ExecMessages);
+   timer.setInterval(50000L, GetPressure);
   
   bot.begin();      // launch Bot functionalities
   sensors.begin();
@@ -129,7 +128,14 @@ void interruptHandler()
 }
 
 void sendThingSpeak(){
+  float exec_time = millis();  
 updateThingSpeak("field1=" + String(DHT_TMP) + "&field2=" + String(TempC_0) + "&field3=" + String(DHT_HYM) + "&field4=" + String(BMP_PRESURE) + "&field5=" + String(BMP_ALTITUDE) + "&field6=" + String(BMP_TEMPERATURE));
+ 
+ exec_time = millis() - exec_time ; 
+    Serial.print("sendThingSpeak execute time is: ");
+    Serial.println(exec_time);
+ exec_time = 0;
+ 
 }
 
 void updateThingSpeak(String tsData) {
@@ -305,8 +311,9 @@ float exec_time = millis();
     if (bot.message[i][5] == "\/reset") {
       bot.sendMessage(bot.message[i][4], "ESP is going to restart...", "");
       bot.message[0][0] = "";   // All messages have been replied - reset new messages
-      delay(1000);
-      ESP.reset();
+      bot.getUpdates(bot.message[0][1]);
+      delay(5000);
+      ESP.restart();
     }
   }
   bot.message[0][0] = "";   // All messages have been replied - reset new messages
@@ -501,4 +508,4 @@ if (!digitalRead(2) == HIGH) { // if your digital input is high
   } else {
     led1.off();
 }
-}*/
+}*/ 
