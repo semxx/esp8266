@@ -19,12 +19,11 @@ char ssid[] = "Mimimi";              // your network SSID (name)
 char password[] = "panatorium";                              // your network key
 
 // Initialize Telegram BOT
-// Initialize Telegram BOT
 
-#define BOTtoken "165672905:AAFhk3XgHITZGDA_M2XEoxAhFaOdxl1Wf6Q"
-//token of TestBOT
+#define BOTtoken "165672905:AAFhk3XgHITZGDA_M2XEoxAhFaOdxl1Wf6Q" //token of TestBOT
 #define BOTname "Neato"
 #define BOTusername "neatobot"
+
 TelegramBOT bot(BOTtoken, BOTname, BOTusername);
 
 int Bot_mtbs = 1000; //mean time between scan messages
@@ -55,8 +54,7 @@ void setup() {
 void loop() {
 
   if (millis() > Bot_lasttime + Bot_mtbs)  {
-    bot.getUpdates(bot.message[0][1]);   // launch aPI GetUpdates up
-to xxx message
+    bot.getUpdates(bot.message[0][1]);   // launch aPI GetUpdates up to xxx message
     Bot_EchoMessages();   // reply to message with Echo
     Bot_lasttime = millis();
     delay(5000);
@@ -73,8 +71,7 @@ void Bot_EchoMessages() {
     EchoResponse = UnicodeASCII(EchoResponse);
     bot.sendMessage(bot.message[i][4], EchoResponse, "");
   }
-  bot.message[0][0] = "";   // all messages have been replied - reset
-new messages
+  bot.message[0][0] = "";   // all messages have been replied - reset new messages
 }
 
 String UnicodeASCII(String input) {
