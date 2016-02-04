@@ -92,13 +92,11 @@ void setup()
    sensors.begin();
    dht.begin();
 
-  Serial.println("Pressure Sensor Test");
-  if(!bmp.begin())
+  if(!bmp.begin())   // Try to launch pressure sensor
   {
     Serial.print("Ooops, no BMP085 detected ... Check your wiring or I2C ADDR!");
     while(1);
   }
-  
   #ifdef DEBUG
     displaySensorDetails();
   #endif
@@ -338,28 +336,9 @@ void updateThingSpeak(String tsData) {
 Blynk.run();
   }
 
-void displaySensorDetails(void)
-{
-  sensor_t sensor;
-  bmp.getSensor(&sensor);
-  Serial.println("------------------------------------");
-  Serial.print  ("Sensor:       "); Serial.println(sensor.name);
-  Serial.print  ("Driver Ver:   "); Serial.println(sensor.version);
-  Serial.print  ("Unique ID:    "); Serial.println(sensor.sensor_id);
-  Serial.print  ("Max Value:    "); Serial.print(sensor.max_value);
-Serial.println(" hPa");
-  Serial.print  ("Min Value:    "); Serial.print(sensor.min_value);
-Serial.println(" hPa");
-  Serial.print  ("Resolution:   "); Serial.print(sensor.resolution);
-Serial.println(" hPa");
-  Serial.println("------------------------------------");
-  Serial.println("");
-  delay(500);
-}
-
-void current_time()
-{
-Metric_Start("CurrentTime");
+void current_time() {
+  
+  Metric_Start("CurrentTime");
   unsigned long currentMillis = millis();
   unsigned long currentTime = getTime(TIMEZONE, DAYLIGHTSAVINGTIME);
 
@@ -370,11 +349,9 @@ Metric_Start("CurrentTime");
   sprintf(timeString,"%02d:%02d:%02d",hours, minutes, seconds);
   //BLYNK_LOG("The time is %s", timeString);       // UTC is the timeat Greenwich Meridian (GMT)
   Blynk.virtualWrite(V12, timeString );
-
   // Serial.println(timeString);
-
- Blynk.run();
- Metric_End();
+  Blynk.run();
+  Metric_End();
 }
 
  BLYNK_WRITE(1)  // Manual restart ESP
@@ -385,7 +362,27 @@ Metric_Start("CurrentTime");
     ESP.reset();
   }
  }
-/*
+ 
+ void displaySensorDetails(void)
+{
+  sensor_t sensor;
+  bmp.getSensor(&sensor);
+  Serial.println("Pressure Sensor Test");
+  Serial.println("------------------------------------");
+  Serial.print  ("Sensor:       "); Serial.println(sensor.name);
+  Serial.print  ("Driver Ver:   "); Serial.println(sensor.version);
+  Serial.print  ("Unique ID:    "); Serial.println(sensor.sensor_id);
+  Serial.print  ("Max Value:    "); Serial.print(sensor.max_value);
+  Serial.println(" hPa");
+  Serial.print  ("Min Value:    "); Serial.print(sensor.min_value);
+  Serial.println(" hPa");
+  Serial.print  ("Resolution:   "); Serial.print(sensor.resolution);
+  Serial.println(" hPa");
+  Serial.println("------------------------------------");
+  Serial.println("");
+  delay(500);
+}
+
  String UnicodeASCII(String input) {
       String s = input;
   //  Serial.print("Input value in function replace: ");
@@ -460,11 +457,11 @@ Metric_Start("CurrentTime");
   //Serial.println(s);
   return s;
 }
-*/
+
 void Metric_Start(String vName) 
 {
 #ifdef DEBUG
-  VoidName = vName;
+   VoidName = vName;
    start_time = 0; 
    start_time = millis();
 #endif
