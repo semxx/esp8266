@@ -25,28 +25,14 @@
 #define DHTTYPE DHT22
 #define ONE_WIRE_BUS 12
 
-// ##################### Describe used functions ##############
-
 OneWire oneWire(ONE_WIRE_BUS);
 DHT dht(DHTPIN, DHTTYPE);
 DallasTemperature sensors(&oneWire);
 Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(10085);
 TelegramBOT bot(BOTtoken, BOTname, BOTusername);
-RCSwitch mySwitch = RCSwitch();
 SimpleTimer timer;
 
-char auth[]  = "77804dfb38444bb381b9bd01145af4f3";
-char auth1[] = "dac663bea5ae4b26b165d8d2d02e5969"; //Auth Tokens for any additional projects
-WidgetLCD lcd(1);
-
-const char* thingSpeakAddress = "api.thingspeak.com";
-String thingSpeakAPIKey = "VQ0584HOI2VHUYSH";
-
-float start_time = 0;
-float TempC_0 = 0;
-float TempC_1 = 0;
-float DHT_HYM, DHT_TMP;
-float BMP_PRESURE, BMP_ALTITUDE, BMP_TEMPERATURE;
+RCSwitch mySwitch = RCSwitch();
 
 char* socket1TriStateOn  = "FFFF0FFF0101";
 char* socket1TriStateOff = "FFFF0FFF0110";
@@ -55,6 +41,20 @@ char* socket2TriStateOff = "FFFF0FFF1010";
 char* socket3TriStateOn  = "FFFF0FF10001";
 char* socket3TriStateOff = "FFFF0FF10010";
 
+
+char auth[]  = "77804dfb38444bb381b9bd01145af4f3";
+char auth1[] = "dac663bea5ae4b26b165d8d2d02e5969"; //Auth Tokens for any additional projects
+WidgetLCD lcd(1);
+
+const char* thingSpeakAddress = "api.thingspeak.com";
+String thingSpeakAPIKey = "VQ0584HOI2VHUYSH";
+
+String VoidName = "";
+float start_time = 0;
+float TempC_0 = 0;
+float TempC_1 = 0;
+float DHT_HYM, DHT_TMP;
+float BMP_PRESURE, BMP_ALTITUDE, BMP_TEMPERATURE;
 
 void Start(String vName) {
 #ifdef DEBUG
@@ -82,7 +82,6 @@ float start_time = 0;
 void dhtRead()
 {
 Start("dht_Read");
- yield();
 
   float h = dht.readHumidity();
   float t = dht.readTemperature();
@@ -118,19 +117,19 @@ void readDallas()
 {
 Start("read_Dallas");
 
-	sensors.requestTemperatures();
-	Blynk.run();
-	TempC_0 = sensors.getTempCByIndex(0);
-//	TempC_1 = sensors.getTempCByIndex(1);
+    sensors.requestTemperatures();
+    Blynk.run();
+    TempC_0 = sensors.getTempCByIndex(0);
+//  TempC_1 = sensors.getTempCByIndex(1);
 
-	char t_buffer[15];
+    char t_buffer[15];
 //  char h_buffer[15];
 
-	dtostrf(TempC_0, 4, 2, t_buffer);
+    dtostrf(TempC_0, 4, 2, t_buffer);
 //  dtostrf(TempC_1, 4, 2, h_buffer);
-	Blynk.virtualWrite(V5, t_buffer);
+    Blynk.virtualWrite(V5, t_buffer);
 //  Blynk.virtualWrite(V6, h_buffer);
-	Blynk.virtualWrite(V7, millis() / 60000L);  // Send UpTime
+    Blynk.virtualWrite(V7, millis() / 60000L);  // Send UpTime
 
  Blynk.run();
  End();
@@ -142,13 +141,21 @@ void Bot_ExecMessages(){
  //   EchoResponse = UnicodeASCII(EchoResponse);
      bot.message[i][5]=bot.message[i][5].substring(1,bot.message[i][5].length());
     if (bot.message[i][5] == "\/ledon") {
-      digitalWrite(2, !HIGH);
+      mySwitch.sendTriState(socket1TriStateOn);
+      delay(100);
+      mySwitch.sendTriState(socket2TriStateOn);
+      delay(100);
+      mySwitch.sendTriState(socket3TriStateOn);
 
-      bot.sendMessage(bot.message[i][4], "Led is ON", "");
+      bot.sendMessage(bot.message[i][4], "Light is ON", "");
     }
     if (bot.message[i][5] == "\/ledoff") {
-      digitalWrite(2, !LOW);
-      bot.sendMessage(bot.message[i][4], "Led is OFF", "");
+      mySwitch.sendTriState(socket1TriStateOff);
+      delay(100);
+      mySwitch.sendTriState(socket2TriStateOff);
+      delay(100);
+      mySwitch.sendTriState(socket3TriStateOff);
+      bot.sendMessage(bot.message[i][4], "Light is OFF everywere...", "");
     }
     if (bot.message[i][5] == "\/weather") {
         Blynk.run();
@@ -183,12 +190,7 @@ void Bot_ExecMessages(){
         Blynk.run();
     }
     if (bot.message[i][5] == "\/start") {
-      String wellcome = "Wellcome from LedBot, your personal Bot on Arduino board";
-      String wellcome1 = "/ledon : to switch the Led ON";
-      String wellcome2 = "/ledoff : to switch the Led OFF";
-      bot.sendMessage(bot.message[i][4], wellcome, "");
-      bot.sendMessage(bot.message[i][4], wellcome1, "");
-      bot.sendMessage(bot.message[i][4], wellcome2, "");
+
     }
     if (bot.message[i][5] == "\/reset") {
       bot.sendMessage(bot.message[i][4], "ESP is going to restart...", "");
@@ -367,7 +369,14 @@ mySwitch.sendTriState(socket3TriStateOn);
   }
   else {mySwitch.sendTriState(socket3TriStateOff);}
  }
-
+BLYNK_WRITE(4)  // Telegram Check
+ {
+  int a = param.asInt();
+    if (a == 0)
+  {
+    TelegramCheck();
+  }
+ }
 void setup()
 {
   Serial.begin(9600);
@@ -420,7 +429,7 @@ void setup()
   }
 
  void loop(){
-	 
+   
   Blynk.run();
   timer.run();
   
