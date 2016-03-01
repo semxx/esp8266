@@ -25,13 +25,12 @@
 #define DHTTYPE DHT22
 #define ONE_WIRE_BUS 12
 
-OneWire oneWire(ONE_WIRE_BUS);
-DHT dht(DHTPIN, DHTTYPE);
-DallasTemperature sensors(&oneWire);
+SimpleTimer timer;
 Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(10085);
 TelegramBOT bot(BOTtoken, BOTname, BOTusername);
-SimpleTimer timer;
-
+DHT dht(DHTPIN, DHTTYPE);
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
 RCSwitch mySwitch = RCSwitch();
 
 char* socket1TriStateOn  = "FFFF0FFF0101";
@@ -57,8 +56,8 @@ float DHT_HYM, DHT_TMP;
 float BMP_PRESURE, BMP_ALTITUDE, BMP_TEMPERATURE;
 
 void Start(String vName) {
+    VoidName = vName; 
 #ifdef DEBUG
-   String VoidName = vName;
    start_time = 0;
    start_time = millis();
 #endif
@@ -70,10 +69,10 @@ void End() {
   Serial.println(VoidName + " execute time is: " + start_time);
     if (start_time > 5000) {    
       Serial.println("WARNING: "+ VoidName +" execute time is too long: (" + start_time + " ms)");
-        lcd.clear();
-        lcd.print(0, 0, VoidName);
-        lcd.print(0, 1, "Delayed: ");
-        lcd.print(9, 1, start_time);
+//        lcd.clear();
+//        lcd.print(0, 0, VoidName);
+//        lcd.print(0, 1, "Delayed: ");
+//        lcd.print(9, 1, start_time);
     }
 float start_time = 0;
 #endif
@@ -158,15 +157,16 @@ void Bot_ExecMessages(){
       bot.sendMessage(bot.message[i][4], "Light is OFF everywere...", "");
     }
     if (bot.message[i][5] == "\/weather") {
-        Blynk.run();
-        //digitalWrite(2, !LOW);
+      
         char t_buffer[15];
         char h_buffer[15];
         char o_buffer[15];
+        char r_buffer[15];
 
         dtostrf(DHT_TMP, 4, 2, t_buffer);
         dtostrf(DHT_HYM, 4, 2, h_buffer);
         dtostrf(TempC_0, 4, 2, o_buffer);
+        dtostrf(BMP_PRESURE, 4, 2, r_buffer);
 
         char str1[20];
         strcpy (str1,"Outdoor t° is: ");
@@ -174,20 +174,24 @@ void Bot_ExecMessages(){
         puts (str1);
 
         bot.sendMessage(bot.message[i][4], str1, "");
-        Blynk.run();
+
         char str2[20];
         strcpy (str2,"Indoor t° is: ");
         strcat (str2, t_buffer);
         puts (str2);
-
         bot.sendMessage(bot.message[i][4], str2, "");
-        Blynk.run();
+
         char str3[20];
         strcpy (str3,"Hymidity is: ");
         strcat (str3, h_buffer);
         puts (str3);
         bot.sendMessage(bot.message[i][4], str3, "");
-        Blynk.run();
+
+        char str4[20];
+        strcpy (str4,"Pressure (mmHg) is: ");
+        strcat (str4, r_buffer);
+        puts (str4);
+        bot.sendMessage(bot.message[i][4], str4, "");
     }
     if (bot.message[i][5] == "\/start") {
 
@@ -344,30 +348,30 @@ Start("CurrentTime");
   int a = param.asInt();
     if (a == 0)
   {
-mySwitch.sendTriState(socket1TriStateOn);
+mySwitch.sendTriState(socket1TriStateOff);
 
   }
-  else {mySwitch.sendTriState(socket1TriStateOff);}
+  else {mySwitch.sendTriState(socket1TriStateOn);}
  }
  BLYNK_WRITE(2)  // RF433 Switch2
  {
   int a = param.asInt();
     if (a == 0)
   {
-mySwitch.sendTriState(socket2TriStateOn);
+mySwitch.sendTriState(socket2TriStateOff);
 
   }
-  else {mySwitch.sendTriState(socket2TriStateOff);}
+  else {mySwitch.sendTriState(socket2TriStateOn);}
  }
  BLYNK_WRITE(3)  // RF433 Switch3
  {
   int a = param.asInt();
     if (a == 0)
   {
-mySwitch.sendTriState(socket3TriStateOn);
+mySwitch.sendTriState(socket3TriStateOff);
 
   }
-  else {mySwitch.sendTriState(socket3TriStateOff);}
+  else {mySwitch.sendTriState(socket3TriStateOn);}
  }
 BLYNK_WRITE(4)  // Telegram Check
  {
@@ -398,7 +402,7 @@ void setup()
    timer.setInterval(45000L, dhtRead);
    timer.setInterval(40000L, readDallas);
    timer.setInterval(60000L, sendThingSpeak);
-// timer.setInterval(10000L, TelegramCheck);
+// timer.setInterval(30000L, TelegramCheck);
    timer.setInterval(50000L, GetPressure);
 
   if(!bmp.begin())
@@ -413,8 +417,8 @@ void setup()
   #ifdef DEBUG
     displaySensorDetails();
   #endif
-  mySwitch.enableTransmit(14);
-  mySwitch.setPulseLength(179);
+    mySwitch.enableTransmit(14);
+    mySwitch.setPulseLength(179);
   //mySwitch.setProtocol(1);
   //mySwitch.setRepeatTransmit(4);
   delay(300);
