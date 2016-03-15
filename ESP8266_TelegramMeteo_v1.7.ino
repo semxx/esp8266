@@ -54,7 +54,6 @@ extern "C" {
 #define LASTJSON 3
 
 //GPIO pin assignments
-//#define DS18B20 12       // Temperature Sensor pin (DS18B20)
 #define LED_IND 4      // LED used for initial code testing (not included in final hardware design)
 
 WiFiServer server(SVRPORT);
@@ -105,15 +104,11 @@ int hours,minutes,seconds;
 unsigned long currentMillis, currentTime;
 
 bool complete=false;
-String VoidName = "";
-float TempC_0 = 0;
-float TempC_1 = 0;
 float start_time = 0;
-float bt,bp,ba,dhtt,dhth,t_light;
-String btmp,bprs,balt;
-char tin[20],tout[20],light[5],dhhumi[20],dhtemp[20]; 
+float TempC_0,TempC_1,bt,bp,ba,dhtt,dhth,t_light;
+String btmp,bprs,balt,VoidName;
+char tin[20],tout[20],light[5],dhhumi[20],dhtemp[20],szT[30]; 
 uint32_t state=0;
-char szT[30];
 
 void Start(String vName) {
 #ifdef DEBUG
@@ -129,10 +124,10 @@ void End() {
   Serial.println(VoidName + " execute time is: " + start_time);
     if (start_time > 5000) {    
       Serial.println("WARNING: "+ VoidName +" execute time is too long: (" + start_time + " ms)");
-        lcd.clear();
-        lcd.print(0, 0, VoidName);
-        lcd.print(0, 1, "Delayed: ");
-        lcd.print(9, 1, start_time);
+//        lcd.clear();
+//        lcd.print(0, 0, VoidName);
+//        lcd.print(0, 1, "Delayed: ");
+//        lcd.print(9, 1, start_time);
     }
 float start_time = 0;
 #endif
@@ -177,86 +172,7 @@ void startWIFI(void) {
   delay(300);
 
 }
-/*
-void getTempDs18b20(int sensor, char * val) {
-  
-  byte i;
-  byte present = 1;
-  byte type_s;
-  byte addr[8];
-  byte data[12];
-  float celsius, fahrenheit;
-  
-  switch(sensor) {
 
-    case 1:  //Outside Sensor Device 0 Address: 28 FF 83 8F 00 15 02 21
-    addr[0]=0x28;
-    addr[1]=0xFF;
-    addr[2]=0x83;
-    addr[3]=0x8F;
-    addr[4]=0x00;
-    addr[5]=0x15;
-    addr[6]=0x02;
-    addr[7]=0x21;
-  break;
-    case 2:  //Inside Sensor
-    addr[0]=0x28;
-    addr[1]=0xFF;
-    addr[2]=0x0B;
-    addr[3]=0x0A;
-    addr[4]=0x62;
-    addr[5]=0x15;
-    addr[6]=0x01;
-    addr[7]=0x84;
-  break;
-    case 3:  //Attic Sensor
-    addr[0]=0x10;
-    addr[1]=0xCB;
-    addr[2]=0x45;
-    addr[3]=0x2F;
-    addr[4]=0x00;
-    addr[5]=0x08;
-    addr[6]=0x00;
-    addr[7]=0x3B;
-  break;
-  }
- 
-  if (OneWire::crc8(addr, 7) != addr[7]) {
-      Serial.println("CRC is not valid!");
-      return;
-  }
-
-  type_s = 0; //DS18B20
-  ds.reset();
-  ds.select(addr);
-  ds.write(0x44,1);         // start conversion, with parasite power on at the end
-  
-  delay(1000);     // maybe 750ms is enough, maybe not
-  // we might do a ds.depower() here, but the reset will take care of it.
-  
-  present = ds.reset();
-  ds.select(addr);    
-  ds.write(0xBE);         // Read Scratchpad
-  
-  for ( i = 0; i < 9; i++) {           // we need 9 bytes
-    data[i] = ds.read();
-  }
-  ds.reset();
-  unsigned int raw = (data[1] << 8) | data[0];
-  if (type_s) {
-    raw = raw << 3; // 9 bit resolution default
-    if (data[7] == 0x10) {
-      // count remain gives full 12 bit resolution
-      raw = (raw & 0xFFF0) + 12 - data[6];
-    }
-  }
-  celsius = (float)raw / 16.0;
-  fahrenheit = celsius * 1.8 + 32.0;
-  ftoa(celsius,val, 2);
-  Serial.println(celsius);
-
-}
-*/
 void updateThingSpeak(String tsData) {
   WiFiClient client;
   yield();
@@ -641,16 +557,24 @@ void sysloop() {
       client.print(s);
       break;
     case Get_SENSORS:
+  updateThingSpeak(thingSpeakAPIKey + "&field1=" + dhtt + "&field2=" + String(TempC_0) + 
+  "&field3=" + dhth + "&field4=" + bprs + "&field5=" + balt + "&field6=" + btmp);
       //Create JSON return string
       s += "Content-Type: application/json\r\n\r\n";
-      jsonEncode(FIRSTJSON,&s,"DS_TempInside", tin);      
+      jsonEncode(FIRSTJSON,&s,"DateTime", TempC_0);      
+      jsonEncode(NEXTJSON,&s,"DHT_TEMP_INDOOR", dhth); 
+      jsonEncode(NEXTJSON,&s,"DHT_TEMP_INDOOR", dhth); 
+      jsonEncode(NEXTJSON,&s,"DHT_HYMIDITY", dhth);
+      jsonEncode(NEXTJSON,&s,"BMP180_PRESSURE", bprs);
+      jsonEncode(NEXTJSON,&s,"BMP180_TEMPERATURE", btmp);
+      jsonEncode(NEXTJSON,&s,"BMP180_ALTITUDE", balt);
       jsonEncode(NEXTJSON,&s,"A0_Lighting", light);
       v = system_get_free_heap_size();
       jsonEncode(NEXTJSON,&s,"SYS_Heap", v);
-      v = millis()/1000;
+      v = millis()/60000L;
       jsonEncode(LASTJSON,&s,"SYS_Time", v);
-      // Send the response to the client
-      client.print(s);
+
+      client.print(s);      // Send the response to the client
       yield();
       //ESP.wdtFeed(); 
       break;
@@ -685,7 +609,7 @@ void setup() {
   }
 
    Blynk.notify("Device has started!");
-// bridge1.setAuthToken(auth1);
+//   bridge1.setAuthToken(auth1);
 
 //############### Define timers ##########
 
@@ -702,21 +626,21 @@ void setup() {
    bot.begin();      // launch TelegramBot functionalities
    DeviceAddress outsideThermometer = { 0x28, 0xFF, 0x83, 0x8F, 0x00, 0x15, 0x02, 0x21 };
    sensors.begin();
-   sensors.setResolution(outsideThermometer, 10);
+   sensors.setResolution(outsideThermometer, TEMPERATURE_PRECISION);
+   mySwitch.enableTransmit(14);
+   mySwitch.setPulseLength(179); 
+  
+   // Set Indicator LED as output
+  
+   pinMode(LED_IND , OUTPUT);
+   digitalWrite(LED_IND, 0);
+
   #ifdef DEBUG
     displaySensorDetails();
   #endif
-    mySwitch.enableTransmit(14);
-    mySwitch.setPulseLength(179); 
-  // Set Indicator LED as output
-  
-  pinMode(LED_IND , OUTPUT);
-  digitalWrite(LED_IND, 0);
-
-  
 
   // Print Free Heap
-  printStatus((char *)" Status: End of Setup",-1);
+  printStatus((char *)" Status: Setup complete",-1);
   delay(500);
   
 }
@@ -832,3 +756,83 @@ BLYNK_WRITE(4)  // Telegram Check
  livolo.sendButton(6400, 120); // blink button #3 every 3 seconds using remote with remoteID #6400
   }
  }
+ /*
+void getTempDs18b20(int sensor, char * val) {
+  
+  byte i;
+  byte present = 1;
+  byte type_s;
+  byte addr[8];
+  byte data[12];
+  float celsius, fahrenheit;
+  
+  switch(sensor) {
+
+    case 1:  //Outside Sensor Device 0 Address: 28 FF 83 8F 00 15 02 21
+    addr[0]=0x28;
+    addr[1]=0xFF;
+    addr[2]=0x83;
+    addr[3]=0x8F;
+    addr[4]=0x00;
+    addr[5]=0x15;
+    addr[6]=0x02;
+    addr[7]=0x21;
+  break;
+    case 2:  //Inside Sensor
+    addr[0]=0x28;
+    addr[1]=0xFF;
+    addr[2]=0x0B;
+    addr[3]=0x0A;
+    addr[4]=0x62;
+    addr[5]=0x15;
+    addr[6]=0x01;
+    addr[7]=0x84;
+  break;
+    case 3:  //Attic Sensor
+    addr[0]=0x10;
+    addr[1]=0xCB;
+    addr[2]=0x45;
+    addr[3]=0x2F;
+    addr[4]=0x00;
+    addr[5]=0x08;
+    addr[6]=0x00;
+    addr[7]=0x3B;
+  break;
+  }
+ 
+  if (OneWire::crc8(addr, 7) != addr[7]) {
+      Serial.println("CRC is not valid!");
+      return;
+  }
+
+  type_s = 0; //DS18B20
+  ds.reset();
+  ds.select(addr);
+  ds.write(0x44,1);         // start conversion, with parasite power on at the end
+  
+  delay(1000);     // maybe 750ms is enough, maybe not
+  // we might do a ds.depower() here, but the reset will take care of it.
+  
+  present = ds.reset();
+  ds.select(addr);    
+  ds.write(0xBE);         // Read Scratchpad
+  
+  for ( i = 0; i < 9; i++) {           // we need 9 bytes
+    data[i] = ds.read();
+  }
+  ds.reset();
+  unsigned int raw = (data[1] << 8) | data[0];
+  if (type_s) {
+    raw = raw << 3; // 9 bit resolution default
+    if (data[7] == 0x10) {
+      // count remain gives full 12 bit resolution
+      raw = (raw & 0xFFF0) + 12 - data[6];
+    }
+  }
+  celsius = (float)raw / 16.0;
+  fahrenheit = celsius * 1.8 + 32.0;
+  ftoa(celsius,val, 2);
+  Serial.println(celsius);
+
+}
+*/
