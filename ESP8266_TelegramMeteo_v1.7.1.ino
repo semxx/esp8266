@@ -103,7 +103,7 @@ bool complete=false;
 float TempC_0,TempC_1,bt,bp,ba,dhtt,dhth,t_light,start_time;
 char tin[20],tout[20],light[5],dhhumi[20],dhtemp[20],szT[30]; 
 uint32_t state=0;
-String btmp,bprs,balt,VoidName;
+String btmp,bprs,balt,VoidName,timeString;
 
 void Start(String vName) {
 #ifdef DEBUG
@@ -306,102 +306,102 @@ void readSensorIsr() {
   yield();
   switch(state++) {
     case 0: // Read Indoor Temperature
-			Start("getTempDs18b20");
-			sensors.requestTemperatures();
-			TempC_0 = sensors.getTempCByIndex(0);
-			char t_buffer[15];
-			dtostrf(TempC_0, 4, 2, t_buffer);
-			Blynk.virtualWrite(V5, t_buffer);
-			// getTempDs18b20(1, tin);
-			// Serial.println(tin);
-			// Blynk.virtualWrite(V5, tin);
-			End();
-		break;
+      Start("getTempDs18b20");
+      sensors.requestTemperatures();
+      TempC_0 = sensors.getTempCByIndex(0);
+      char t_buffer[15];
+      dtostrf(TempC_0, 4, 2, t_buffer);
+      Blynk.virtualWrite(V5, t_buffer);
+      // getTempDs18b20(1, tin);
+      // Serial.println(tin);
+      // Blynk.virtualWrite(V5, tin);
+      End();
+    break;
     case 1: // Read Outdoor Temperature
-			// getTempDs18b20(2, tout);
-			// Blynk.virtualWrite(V6, tout);
-		break;
+      // getTempDs18b20(2, tout);
+      // Blynk.virtualWrite(V6, tout);
+    break;
     case 2: // Read DHT22 Humidity and Temperature
-			Start("Read DHT22");
-			dhth = dht.readHumidity();
-			dhtt = dht.readTemperature();
-			if (isnan(dhth) || isnan(dhtt)) {
-			Serial.println("Failed to read from DHT sensor!");
-			//return;
-			}
+      Start("Read DHT22");
+      dhth = dht.readHumidity();
+      dhtt = dht.readTemperature();
+      if (isnan(dhth) || isnan(dhtt)) {
+      Serial.println("Failed to read from DHT sensor!");
+      //return;
+      }
 
-			Blynk.virtualWrite(10, dhtt); // virtual pin
-			Blynk.virtualWrite(11, dhth); // virtual pin
+      Blynk.virtualWrite(10, dhtt); // virtual pin
+      Blynk.virtualWrite(11, dhth); // virtual pin
 
-			#ifdef DEBUG
-			Serial.print("DHT humidity: ");
-			Serial.print(dhth);
-			Serial.print(" %\t");
-			Serial.print("DHT temperature: ");
-			Serial.print(dhtt);
-			Serial.println(" C ");
-			#endif
-			End();
-		break;
+      #ifdef DEBUG
+      Serial.print("DHT humidity: ");
+      Serial.print(dhth);
+      Serial.print(" %\t");
+      Serial.print("DHT temperature: ");
+      Serial.print(dhtt);
+      Serial.println(" C ");
+      #endif
+      End();
+    break;
     case 3: // Read luminosity A0
-			Start("Read luminosity A0");
-			t_light = analogRead(A0);
-			ftoa(t_light,light, 0);
-			End();
-		break;
+      Start("Read luminosity A0");
+      t_light = analogRead(A0);
+      ftoa(t_light,light, 0);
+      End();
+    break;
     case 4: //Read Baro Pressure
-			Start("READ BMP180");
-			sensors_event_t event;
-			bmp.getEvent(&event);
+      Start("READ BMP180");
+      sensors_event_t event;
+      bmp.getEvent(&event);
 
-			if (event.pressure)
-			{
-			float temperature;
-			bmp.getTemperature(&temperature);
-			float seaLevelPressure = SENSORS_PRESSURE_SEALEVELHPA;
-			bprs = event.pressure*0.75006375541921;
-			balt = (bmp.pressureToAltitude(seaLevelPressure, event.pressure));
-			btmp = temperature;
-			Blynk.virtualWrite(V8, bprs);
-			Blynk.virtualWrite(V9, balt);
-			Blynk.virtualWrite(V13, btmp);
-			}
-			else
-			{
-			Serial.println("Sensor error");
-			}
-			End();
-		break;
+      if (event.pressure)
+      {
+      float temperature;
+      bmp.getTemperature(&temperature);
+      float seaLevelPressure = SENSORS_PRESSURE_SEALEVELHPA;
+      bprs = event.pressure*0.75006375541921;
+      balt = (bmp.pressureToAltitude(seaLevelPressure, event.pressure));
+      btmp = temperature;
+      Blynk.virtualWrite(V8, bprs);
+      Blynk.virtualWrite(V9, balt);
+      Blynk.virtualWrite(V13, btmp);
+      }
+      else
+      {
+      Serial.println("Sensor error");
+      }
+      End();
+    break;
     case 5: // Get current time from NTP server
-			Start("CurrentTime");
-			currentMillis = millis();
-			currentTime = getTime(TIMEZONE, DAYLIGHTSAVINGTIME);
-			hours = (currentTime  % 86400L) / 3600;
-			minutes = (currentTime % 3600) / 60;
-			seconds = (currentTime % 60);
-			char timeString[8];
-			sprintf(timeString,"%02d:%02d:%02d",hours, minutes, seconds);
-		    //BLYNK_LOG("The time is %s", timeString);       // UTC is thetimeat Greenwich Meridian (GMT)
-			Blynk.virtualWrite(V12, timeString );
-			End();
-		break;
+      Start("CurrentTime");
+      currentMillis = millis();
+      currentTime = getTime(TIMEZONE, DAYLIGHTSAVINGTIME);
+      hours = (currentTime  % 86400L) / 3600;
+      minutes = (currentTime % 3600) / 60;
+      seconds = (currentTime % 60);
+      char timeString[8];
+      sprintf(timeString,"%02d:%02d:%02d",hours, minutes, seconds);
+        //BLYNK_LOG("The time is %s", timeString);       // UTC is thetimeat Greenwich Meridian (GMT)
+      Blynk.virtualWrite(V12, timeString );
+      End();
+    break;
     case 6:
 
-		break;
+    break;
     case 7:
-			Blynk.virtualWrite(V7, millis() / 60000L);  // Send UpTime
-			state = 0;
-		break;
+      Blynk.virtualWrite(V7, millis() / 60000L);  // Send UpTime
+      state = 0;
+    break;
     default:
-		break;
+    break;
   }
   ESP.wdtFeed(); 
   yield();
 }
 void sendThingSpeak(){
-	  Start("sendThingSpeak");
-	  UpdateThingSpeak(thingSpeakAPIKey + "&field1=" + dhtt + "&field2=" + String(TempC_0) + "&field3=" + dhth + "&field4=" + bprs + "&field5=" + balt + "&field6=" + btmp);
-	  End();
+    Start("sendThingSpeak");
+    UpdateThingSpeak(thingSpeakAPIKey + "&field1=" + dhtt + "&field2=" + String(TempC_0) + "&field3=" + dhth + "&field4=" + bprs + "&field5=" + balt + "&field6=" + btmp);
+    End();
 }
 void jsonAdd(String *s, String key,String val) {
     *s += '"' + key + '"' + ":" + '"' + val + '"';
@@ -543,10 +543,9 @@ void sysloop() {
   "&field3=" + dhth + "&field4=" + bprs + "&field5=" + balt + "&field6=" + btmp);
       //Create JSON return string
       s += "Content-Type: application/json\r\n\r\n";
-      jsonEncode(FIRSTJSON,&s,"DateTime", TempC_0);      
-      jsonEncode(NEXTJSON,&s,"DHT_TEMP_INDOOR", dhth); 
-      jsonEncode(NEXTJSON,&s,"DHT_TEMP_INDOOR", dhth); 
-      jsonEncode(NEXTJSON,&s,"DHT_HYMIDITY", dhth);
+      jsonEncode(FIRSTJSON,&s,"DateTime", timeString );      
+      jsonEncode(NEXTJSON,&s,"DHT_TEMP_INDOOR", String(TempC_0)); 
+      jsonEncode(NEXTJSON,&s,"DHT_HYMIDITY", String(dhth));
       jsonEncode(NEXTJSON,&s,"BMP180_PRESSURE", bprs);
       jsonEncode(NEXTJSON,&s,"BMP180_TEMPERATURE", btmp);
       jsonEncode(NEXTJSON,&s,"BMP180_ALTITUDE", balt);
