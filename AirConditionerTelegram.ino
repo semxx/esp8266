@@ -20,7 +20,7 @@
 char auth[]  = "b92e451545454a85b3602e7f432aeb66";
 //char auth1[] = "dac663bea5ae4b26b165d8d2d02e5969"; //Auth Tokens for any additional projects
 
-const char* ssid = "Mimimi";          //your wifi ssid
+const char* ssid = "Xiaomi2G";          //your wifi ssid
 const char* password = "panatorium";  //your wifi password
 
 IRsend irsend(5); //an IR led is connected to GPIO pin 0
@@ -77,6 +77,16 @@ void Bot_ExecMessages(){
       irsend.sendRaw(off_mode,230,38);
       delay(100);
       bot.sendMessage(bot.message[i][4], "Air conditioner is OFF...", "");
+    }
+    if (bot.message[i][5] == "\/21") {
+    irsend.sendRaw(t_21,230,38);
+    delay(1000);
+    bot.sendMessage(bot.message[i][4], "Temp sucsessfuly set to +21", "");
+    }
+    if (bot.message[i][5] == "\/22") {
+    irsend.sendRaw(t_22,230,38);
+    delay(1000);
+    bot.sendMessage(bot.message[i][4], "Temp sucsessfuly set to +22", "");
     }
     if (bot.message[i][5] == "\/23") {
     irsend.sendRaw(t_23,230,38);
@@ -144,7 +154,7 @@ void setup()
   Serial.begin(9600);
   delay(10);
   irsend.begin();
-  Blynk.begin(auth, "Mimimi", "panatorium");
+  Blynk.begin(auth, ssid, password);
    while (Blynk.connect() == false) {
     // Wait until connected
   }
