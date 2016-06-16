@@ -7,11 +7,9 @@
 #include <BlynkSimpleEsp8266.h>
 #include <WiFiClientSecure.h>
 #include <ESP8266TelegramBOT.h>
+
 //#include <SimpleTimer.h>
 
-//#define PanasonicAddress      0x4004     // Panasonic address (Pre data) 
-//#define PanasonicPower        0x100BCBD  // Panasonic Power button
-//#define JVCPower              0xC5E8
 #define BOTtoken "165672905:AAFhk3XgHITZGDA_M2XEoxAhFaOdxl1Wf6Q"
 #define BOTname "Neato"
 #define BOTusername "neatobot"
