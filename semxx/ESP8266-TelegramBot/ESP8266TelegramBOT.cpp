@@ -45,17 +45,24 @@ void TelegramBOT::begin(void)	{
  * (Argument to pass: URL to address to Telegram)                                                 *
  **************************************************************************************************/
 String TelegramBOT::connectToTelegram(String command)  {
+	const char* host = "api.telegram.org";
+	const int httpsPort = 443;
     String mess="";
     long now;
     bool avail;
     // Connect with api.telegram.org       
-    IPAddress server(149,154,167,198);
-    if (client.connect(server, 443)) {  
+//    IPAddress server(149,154,167,198);
+    if (client.connect(host, 443)) {  
         //Serial.println(".... connected to server");
         String a="";
         char c;
 	int ch_count=0;
-        client.println("GET /"+command);
+//      client.println("GET /"+command);
+		client.print(String("GET /") + command +" HTTP/1.1\r\n" +
+		"Host: api.telegram.org\r\n" +
+		"User-Agent: ESP8266\r\n" +
+		"Connection: close\r\n\r\n");
+		
         now=millis();
         avail=false;
         while (millis()-now<1500) {  
