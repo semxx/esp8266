@@ -38,8 +38,11 @@ BME280 bmeSensor;
 #endif
 
 #if defined(SHT21_ON)
-#include "HTU21D.h"
+#include <HTU21D.h>
 HTU21D myHTU21D;
+
+
+
 #endif
 
 ADC_MODE(ADC_VCC);
@@ -1027,7 +1030,7 @@ void GetSHT21SensorData(){
     Serial.println(F("GetSHT21SensorData() Start"));
   #endif
 
-  myHTU21D.setResolution(HTU21D_RES_RH8_TEMP12);
+  myHTU21D.setResolution(HTU21D_RES_RH11_TEMP11);
   temperatureString = String(myHTU21D.readTemperature());
   humidityString = String(myHTU21D.readCompensatedHumidity());
 
@@ -3231,7 +3234,7 @@ void setup() {
   digitalWrite(atoi(JConf.light2_pin), LOW);
 
   #ifdef SHT21_ON
-    myHTU21D.begin();
+  myHTU21D.begin(13, 14);
   #endif
 
   #ifdef DHT_ON
@@ -3269,7 +3272,7 @@ void setup() {
   if (!WiFiSetup()) {
     WiFiSafeSetup();
   }
-  delay(1000);
+  delay(2000);
 
 
   if (atoi(JConf.mqtt_enable) == 1) {
