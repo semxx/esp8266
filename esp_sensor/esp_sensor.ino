@@ -15,6 +15,7 @@ extern "C" {
 #include "SPI.h"
 #include <BH1750.h>
 #include <NTPClient.h>
+#include <WiFiUdp.h>
 #include "json_config.h"
 #include <ArduinoJson.h>
 
@@ -40,9 +41,6 @@ BME280 bmeSensor;
 #if defined(SHT21_ON)
 #include <HTU21D.h>
 HTU21D myHTU21D;
-
-
-
 #endif
 
 ADC_MODE(ADC_VCC);
@@ -74,6 +72,7 @@ String temperatureString = "none";
 String pressureString =    "none";
 String humidityString =    "none";
 String luxString =         "none";
+String RSSIString =        "none";
 String ipString =          "none";
 String macString =         "none";
 String uptimeString =      "none";
@@ -82,46 +81,12 @@ String freeMemoryString =  "none";
 String lightState =        "AUTO";
 String lightState2 =       "AUTO";
 
+WiFiUDP ntpUDP;
 BH1750 lightSensor;
 PubSubClient mqttClient;
-
-long Day=0;
-int Hour =0;
-int Minute=0;
-int Second=0;
-int HighMillis=0;
-int Rollover=0;
-
-unsigned long getDataTimer = 0;
-unsigned long publishTimer = 2000;
-unsigned long motionTimer = 4000;
-unsigned long rebootTimer = 6000;
-unsigned long subscribeTimer = (atoi(JConf.subscribe_delay) *1000UL) - 5000UL;
-unsigned long lightOffTimer = 0;
-unsigned long lightOffTimer2 = 0;
-
-bool motionDetect = false;
-
-bool wifiSafeMode = false;
-
-WiFiClient espClient;
-
-NTPClient timeClient;
-
-char topic_buff[120];
-char value_buff[120];
-
-String network_html;          // Список доступных Wi-Fi точек
-
-ESP8266WebServer WebServer(80);
-
-
-int cycleNow[ESP_PINS];
-int cycleEnd[ESP_PINS];
-
-unsigned long timerDigitalPin[ESP_PINS];
-int delayDigitalPin = 10;
 Livolo livolo(5);
+WiFiClient espClient;
+NTPClient timeClient(ntpUDP,JConf.ntp_server, atoi(JConf.my_time_zone) * 60 * 60, 60000);
 RCSwitch mySwitch = RCSwitch();
 
 //Socket 1416
@@ -139,6 +104,40 @@ char* socket12TriStateOn  = "0FFFFFFF1001";
 char* socket12TriStateOff = "0FFFFFFF1010";
 char* socket13TriStateOn  = "0FFFFFF10001";
 char* socket13TriStateOff = "0FFFFFF10010";
+
+long Day=0;
+int Hour =0;
+int Minute=0;
+int Second=0;
+int HighMillis=0;
+int Rollover=0;
+
+unsigned long getDataTimer = 0;
+unsigned long publishTimer = 2000;
+unsigned long motionTimer = 4000;
+unsigned long rebootTimer = 6000;
+unsigned long subscribeTimer = (atoi(JConf.subscribe_delay) *1000UL) - 5000UL;
+unsigned long lightOffTimer = 0;
+unsigned long lightOffTimer2 = 0;
+
+bool motionDetect = false;
+bool wifiSafeMode = false;
+
+
+char topic_buff[120];
+char value_buff[120];
+
+String network_html;          // Список доступных Wi-Fi точек
+
+ESP8266WebServer WebServer(80);
+
+
+int cycleNow[ESP_PINS];
+int cycleEnd[ESP_PINS];
+
+unsigned long timerDigitalPin[ESP_PINS];
+int delayDigitalPin = 10;
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////         HTML SNIPPLETS
 
 /*
@@ -343,6 +342,11 @@ const char jsIlluminanceP[] PROGMEM =
 "xmldoc = xmlResponse.getElementsByTagName('illuminance');\
 message = xmldoc[0].firstChild.nodeValue;\
 document.getElementById('illuminanceId').innerHTML=message;";
+
+const char jsWifiRSSIP[] PROGMEM = 
+"xmldoc = xmlResponse.getElementsByTagName('WifiRSSI');\
+message = xmldoc[0].firstChild.nodeValue;\
+document.getElementById('WifiRSSIId').innerHTML=message;";
 
 const char jsPressureP[] PROGMEM = 
 "xmldoc = xmlResponse.getElementsByTagName('pressure');\
@@ -1124,7 +1128,7 @@ void MotionDetect(){
 
 
 String GetUptimeData(){
-
+RSSIString = WiFi.RSSI();
   #ifdef DEBUG
     unsigned long start_time = millis();
     Serial.println(F("GetUptimeData() Start"));
@@ -1598,6 +1602,7 @@ void WebRoot(void) {
   String jsTemperature;         jsTemperature += FPSTR(jsTemperatureP);
   String jsHumidity;            jsHumidity += FPSTR(jsHumidityP);
   String jsPressure;            jsPressure += FPSTR(jsPressureP);
+  String jsWifiRSSI;            jsWifiRSSI += FPSTR(jsWifiRSSIP);
   String jsIlluminance;         jsIlluminance += FPSTR(jsIlluminanceP);
   String jsNtp;                 jsNtp += FPSTR(jsNtpP);
   String javaScriptEnd;         javaScriptEnd += FPSTR(javaScriptEndP);
@@ -1642,10 +1647,10 @@ void WebRoot(void) {
   }
   
   String title2       = panelHeaderName + String(F("Settings"))      + panelHeaderEnd;
-  //title2             += panelBodySymbol + String(F("signal"))        + panelBodyName + String(F("Wi-Fi SSID"))  + panelBodyValue + closingAngleBracket + JConf.sta_ssid    + panelBodyEnd;
+  title2             += panelBodySymbol + String(F("signal"))        + panelBodyName + String(F("Wi-Fi SSID"))  + panelBodyValue + JConf.sta_ssid + closingAngleBracket +  String(F(" id='WifiRSSIId'"))   + panelBodyEnd;
   title2             += panelBodySymbol + String(F("globe"))         + panelBodyName + String(F("IP Address"))  + panelBodyValue + closingAngleBracket + ipString          + panelBodyEnd;
-  //title2             += panelBodySymbol + String(F("scale"))         + panelBodyName + String(F("MAC Address")) + panelBodyValue + closingAngleBracket + macString         + panelBodyEnd;
-  //title2             += panelBodySymbol + String(F("tag"))           + panelBodyName + String(F("MQTT Prefix")) + panelBodyValue + closingAngleBracket + JConf.mqtt_name   + panelBodyEnd;
+  title2             += panelBodySymbol + String(F("scale"))         + panelBodyName + String(F("MAC Address")) + panelBodyValue + closingAngleBracket + macString         + panelBodyEnd;
+  title2             += panelBodySymbol + String(F("tag"))           + panelBodyName + String(F("MQTT Prefix")) + panelBodyValue + closingAngleBracket + JConf.mqtt_name   + panelBodyEnd;
 
   title2             += panelBodySymbol + String(F("time"))          + panelBodyName + String(F("Uptime"))      + panelBodyValue + String(F(" id='uptimeId'"))     + closingAngleBracket  + panelBodyEnd;
 
@@ -1655,7 +1660,7 @@ void WebRoot(void) {
 
   title2             += panelBodySymbol + String(F("flash"))         + panelBodyName + String(F("Voltage"))     + panelBodyValue + String(F(" id='vccId'"))        + closingAngleBracket  + panelBodyEnd;
   title2             += panelBodySymbol + String(F("flash"))         + panelBodyName + String(F("Free Memory")) + panelBodyValue + String(F(" id='freeMemoryId'")) + closingAngleBracket  + panelBodyEnd;
-  //title2             += panelBodySymbol + String(F("flag"))          + panelBodyName + String(F("Version"))     + panelBodyValue + closingAngleBracket + String(ver)                      + panelBodyEnd;
+  title2             += panelBodySymbol + String(F("flag"))          + panelBodyName + String(F("Version"))     + panelBodyValue + closingAngleBracket + String(ver)                      + panelBodyEnd;
 
   String data = headerStart + JConf.module_id + headerStart2 + headerEnd + javaScript;
 
@@ -3316,11 +3321,15 @@ void setup() {
 
 */
 
+  
   if (atoi(JConf.ntp_enable) == 1) {
-    timeClient.reconfigure(JConf.ntp_server, atoi(JConf.my_time_zone) * 60 * 60, 60000);
+  timeClient.begin();
   }
    mySwitch.enableTransmit(5);
    mySwitch.setPulseLength(179); 
+
+
+  
 }
 
 
