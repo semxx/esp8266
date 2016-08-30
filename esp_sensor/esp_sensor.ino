@@ -119,7 +119,10 @@ unsigned long rebootTimer = 6000;
 unsigned long subscribeTimer = (atoi(JConf.subscribe_delay) *1000UL) - 5000UL;
 unsigned long lightOffTimer = 0;
 unsigned long lightOffTimer2 = 0;
-
+unsigned long wifiSafeModeReconnectTimer = 0;
+ 
+unsigned long wifiSafeModeReconnectDelay=600000;
+ 
 bool motionDetect = false;
 bool wifiSafeMode = false;
 
@@ -3467,6 +3470,12 @@ void loop() {
 */
   }
 
+  if (wifiSafeMode == true && millis() - wifiSafeModeReconnectTimer >= wifiSafeModeReconnectDelay ) {
+     wifiSafeModeReconnectTimer = millis();
+     if ( WiFiSetup() ) {
+       wifiSafeMode = false; 
+     }
+   }
 /*
   if (WiFi.status() != WL_CONNECTED) {
     #ifdef DEBUG
