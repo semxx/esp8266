@@ -1,11 +1,11 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClientSecure.h>
 
-// GPIO 4
-#define GPIO 4
+// GPIO 2
+#define GPIO 2
 
-const char* WIFI_SSID            = "ssid";
-const char* WIFI_PASSWORD        = "password";
+const char* WIFI_SSID            = "Mimimi";
+const char* WIFI_PASSWORD        = "panatorium";
 
 const int REQUEST_TIMEOUT        = 5 * 1000;           // 5 seconds
 const int WAIT_TIME              = 6 * 60 * 60 * 1000; // 6 hours
@@ -17,7 +17,7 @@ const char* CHECK_URL1           = "/";
 const char* CHECK_HOST2          = "www.google.com";
 const char* CHECK_URL2           = "/";
 
-const char* MONITOR_HOST         = "host.com";
+const char* MONITOR_HOST         = "yandex.ru";
 const char* MONITOR_URL_UP       = "/web/up";
 const char* MONITOR_URL_DOWN     = "/web/down";
 
