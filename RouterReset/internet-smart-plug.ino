@@ -2,30 +2,31 @@
 #include <WiFiClientSecure.h>
 
 // GPIO 2
-#define GPIO 2
+#define GPIO 5
 
-const char* WIFI_SSID            = "Mimimi";
+const char* WIFI_SSID            = "Xiaomi_2G";
 const char* WIFI_PASSWORD        = "panatorium";
 
 const int REQUEST_TIMEOUT        = 5 * 1000;           // 5 seconds
-const int WAIT_TIME              = 6 * 60 * 60 * 1000; // 6 hours
+//const int WAIT_TIME              = 6 * 60 * 60 * 1000; // 6 hours
+const int WAIT_TIME              = 1 * 60 * 1000; // 60 sec
 
 const int MAX_TRIES              = 10;
 
-const char* CHECK_HOST1          = "fr.mappy.com";
+const char* CHECK_HOST1          = "www.google.com";
 const char* CHECK_URL1           = "/";
-const char* CHECK_HOST2          = "www.google.com";
+const char* CHECK_HOST2          = "fr.mappy.com";
 const char* CHECK_URL2           = "/";
 
 const char* MONITOR_HOST         = "yandex.ru";
-const char* MONITOR_URL_UP       = "/web/up";
-const char* MONITOR_URL_DOWN     = "/web/down";
+const char* MONITOR_URL_UP       = "/internet";
+const char* MONITOR_URL_DOWN     = "/maps";
 
 unsigned const int HTTPS_PORT = 443;
 
 void setup() {
   pinMode(GPIO, OUTPUT);
-  digitalWrite(GPIO, LOW);
+  digitalWrite(GPIO, 1);
   
   Serial.begin(115200);
   delay(1000);
@@ -49,7 +50,7 @@ void loop() {
   Serial.println(online ? "OK" : "KO");
   Serial.println("");
 
-  get(MONITOR_HOST, online ? MONITOR_URL_UP : MONITOR_URL_DOWN);
+ // get(MONITOR_HOST, online ? MONITOR_URL_UP : MONITOR_URL_DOWN);
 
   if (!online) {
     cyclePower();
@@ -88,6 +89,8 @@ void connectToWifi() {
     i++;
     if (i > 50) {
         Serial.println("can’t connect to wifi");
+        cyclePower();
+        delay(5000);
         stopWifiAndReboot();
       }
   }
@@ -141,10 +144,9 @@ boolean get(const char* host, const char* url) {
 // Turn plug off then on
 void cyclePower() {
   Serial.println("turning plug off");
-  digitalWrite(GPIO, HIGH);
+  digitalWrite(GPIO, 0);
   delay(5000);
-  digitalWrite(GPIO, LOW);
+  digitalWrite(GPIO, 1);
   Serial.println("turning plug on");
 }
-
 
