@@ -149,4 +149,3 @@ void cyclePower() {
   digitalWrite(GPIO, 1);
   Serial.println("turning plug on");
 }
-
