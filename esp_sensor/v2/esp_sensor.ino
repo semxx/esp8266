@@ -24,15 +24,9 @@ extern "C" {
   Espuart Uart;
 #endif
 
-#if defined(LCD_1602_ON)
+#ifdef LCD_1602_ON
   #include <LiquidCrystal_I2C.h>
   LiquidCrystal_I2C lcd(0x3F, 20, 4);
-  lcd.init();   // initializing the LCD
-  lcd.backlight(); // Enable or Turn On the backlight 
-  lcd.setCursor(0, 0);
-  lcd.print("ESP SENS"); // Start Print text to Line 1
-  lcd.setCursor(0, 1);      
-  lcd.print("-----------------------"); // Start Print Test to Line 2
 #endif
 
 #if defined(BMP085_ON)
@@ -46,8 +40,10 @@ extern "C" {
   #include <OneWire.h>
   #include <DallasTemperature.h>
   #define ONE_WIRE_BUS 12
+  #define TEMPERATURE_PRECISION 9
   OneWire oneWire(ONE_WIRE_BUS);
   DallasTemperature sensors(&oneWire);
+  DeviceAddress insideThermometer;
   float TempC_0 = 0;
   float TempC_1 = 0;
 #endif
@@ -501,6 +497,10 @@ const char OFFP[] PROGMEM  = "OFF";
 #ifdef DALLAS_ON
   void readDallas()
   {
+  #ifdef DEBUG
+    unsigned long start_time = millis();
+    Serial.println(F("readDallas() Start"));
+  #endif
       sensors.requestTemperatures();
       TempC_0 = sensors.getTempCByIndex(0);
   //  TempC_1 = sensors.getTempCByIndex(1);
@@ -508,15 +508,25 @@ const char OFFP[] PROGMEM  = "OFF";
   //  char h_buffer[15];
       dtostrf(TempC_0, 4, 2, t_buffer);
   //  dtostrf(TempC_1, 4, 2, h_buffer);
-      Blynk.virtualWrite(V5, t_buffer);
-  //  Blynk.virtualWrite(V6, h_buffer);
-      Blynk.virtualWrite(V7, millis() / 60000L);  // Send UpTime
+  //    Blynk.virtualWrite(V5, t_buffer);
+  //   Blynk.virtualWrite(V6, h_buffer);
+ //     Blynk.virtualWrite(V7, millis() / 60000L);  // Send UpTime
+  Serial.print("DALLAS TEMPERATURE: ");
+  Serial.println(TempC_0);
+  #ifdef DEBUG
+    unsigned long load_time = millis() - start_time;
+    Serial.print(F("readDallas() Load Time: ")); Serial.println(load_time);
+  #endif
   }
 #endif
   
 #ifdef BMP085_ON
   void GetPressure()
   {
+  #ifdef DEBUG
+    unsigned long start_time = millis();
+    Serial.println(F("GetPressure() Start"));
+  #endif
     sensors_event_t event;
     bmp.getEvent(&event);
   
@@ -528,14 +538,20 @@ const char OFFP[] PROGMEM  = "OFF";
       BMP_PRESURE = event.pressure*0.75006375541921;
       BMP_ALTITUDE = (bmp.pressureToAltitude(seaLevelPressure, event.pressure));
       BMP_TEMPERATURE = temperature;
-      Blynk.virtualWrite(V8, BMP_PRESURE);
-      Blynk.virtualWrite(V9, BMP_ALTITUDE);
-      Blynk.virtualWrite(V13, BMP_TEMPERATURE);
+   //   Blynk.virtualWrite(V8, BMP_PRESURE);
+   //   Blynk.virtualWrite(V9, BMP_ALTITUDE);
+   //   Blynk.virtualWrite(V13, BMP_TEMPERATURE);
+      Serial.println(BMP_PRESURE);
+      Serial.println(BMP_TEMPERATURE);
     }
     else
     {
       Serial.println("Sensor error");
     }
+    #ifdef DEBUG
+    unsigned long load_time = millis() - start_time;
+    Serial.print(F("GetPressure() Load Time: ")); Serial.println(load_time);
+  #endif
   }
 #endif
 
@@ -908,8 +924,8 @@ bool WiFiSetup()
   } else if (atoi(JConf.wifi_mode) == STA) {
     //setup station mode
     WiFi.mode(WIFI_STA);
-   // WiFi.begin(JConf.sta_ssid, JConf.sta_pwd);
-    Blynk.begin(auth, JConf.sta_ssid, JConf.sta_pwd);
+    WiFi.begin(JConf.sta_ssid, JConf.sta_pwd);
+   // Blynk.begin(auth, JConf.sta_ssid, JConf.sta_pwd);
     delay(500);
     //setup PHY_MODE
     wifi_set_phy_mode((phy_mode_t)PHY_MODE_11N);
@@ -939,8 +955,8 @@ bool WiFiSetup()
     WiFi.hostname(JConf.module_id);
   } else if (atoi(JConf.wifi_mode) == AP_STA) {
     WiFi.mode(WIFI_AP_STA);
-    Blynk.begin(auth, JConf.sta_ssid, JConf.sta_pwd);
-//    WiFi.begin(JConf.sta_ssid, JConf.sta_pwd);
+    //Blynk.begin(auth, JConf.sta_ssid, JConf.sta_pwd);
+    WiFi.begin(JConf.sta_ssid, JConf.sta_pwd);
 
     delay(500);
     byte i=0;
@@ -3281,18 +3297,28 @@ void WebServerInit()
 
 void setup() {
 
-// Setup console
-  
+#ifdef LCD_1602_ON
+  lcd.init();   // initializing the LCD
+  lcd.backlight(); // Enable or Turn On the backlight // Setup console
+  lcd.setCursor(0, 0);
+  lcd.print("ESP SENS"); // Start Print text to Line 1
+  lcd.setCursor(0, 1);      
+  lcd.print("-----------------------"); // Start Print Test to Line 2
+#endif
+
+ 
 #ifdef DEBUG
   Serial.begin(115200);
   delay(10);
   Serial.println();
 #endif
   
-Wire.begin(13,14); //SDA=4, SCL=5
+Wire.begin(4,5); //SDA=4, SCL=5
 
-#ifdef(DALLAS_ON)
+#ifdef DALLAS_ON
   sensors.begin();
+ (!sensors.getAddress(insideThermometer, 0));
+ sensors.setResolution(insideThermometer, TEMPERATURE_PRECISION);
 #endif
 
 #ifdef BMP085_ON
@@ -3336,7 +3362,7 @@ Wire.begin(13,14); //SDA=4, SCL=5
   digitalWrite(atoi(JConf.light2_pin), LOW);
 
   #ifdef SHT21_ON
-  myHTU21D.begin(13, 14);
+  myHTU21D.begin(4, 5);
   #endif
 
   #ifdef DHT_ON
@@ -3474,11 +3500,11 @@ void loop() {
     #endif
 
     #ifdef BMP085_ON
-        GetPressure()
+        GetPressure();
     #endif
 
     #ifdef DALLAS_ON
-        readDallas()
+        readDallas();
     #endif
 
     #ifdef DEBUG
@@ -3491,7 +3517,6 @@ void loop() {
 
     GetUptimeData();
     GetFreeMemory();
-
     GetMacString();
 
     #ifdef DHT_ON
@@ -3617,6 +3642,6 @@ void loop() {
     }
   #endif
 
- Blynk.run();
+ //Blynk.run();
  
 }
