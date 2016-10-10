@@ -7,7 +7,7 @@
 
 
 //#define DHT_ON
-#define BME280_ON
+//#define BME280_ON
 #define DALLAS_ON
 #define BMP085_ON
 #define LCD_1602_ON
@@ -54,18 +54,18 @@ class JsonConf
     char wifi_phy_mode                [2]  = "0"                  ;
     char wifi_channel                 [3]  = "10"                 ;
     char wifi_auth                    [2]  = "0"                  ;
-    char sta_ssid                     [32] = "IoT"                ;
-    char sta_pwd                      [32] = "Poiu0987"           ;
-    char ap_pwd                       [32] = "Poiu0987"           ;
-    char static_ip                    [16] = "192.168.2.220"      ;
-    char static_gateway               [16] = "192.168.2.1"        ;
+    char sta_ssid                     [32] = "Xiaomi_2G"                ;
+    char sta_pwd                      [32] = "panatorium"           ;
+    char ap_pwd                       [32] = "panatorium"           ;
+    char static_ip                    [16] = "10.10.10.213"      ;
+    char static_gateway               [16] = "10.10.10.1"        ;
     char static_subnet                [16] = "255.255.255.0"      ;
     char ntp_server                   [32] = "europe.pool.ntp.org";
-    char my_time_zone                 [4]  = "+6"                 ;
-    char mqtt_server                  [32] = "192.168.2.205"      ;
+    char my_time_zone                 [4]  = "+3"                 ;
+    char mqtt_server                  [32] = "10.10.10.25"      ;
     char mqtt_port                    [6]  = "1883"               ;
-    char mqtt_user                    [32] = "none"               ;
-    char mqtt_pwd                     [32] = "none"               ;
+    char mqtt_user                    [32] = "admin"               ;
+    char mqtt_pwd                     [32] = "admin"               ;
     char mqtt_name                    [32] = "_BedM"              ;
     char publish_topic                [32] = "/stateSub/"         ;
     char subscribe_topic              [32] = "/statePub/"         ;
@@ -79,7 +79,7 @@ class JsonConf
     char light2on_lux                 [6]  = "10"                 ; // Значение в люксах, ниже которого будет включаться нагрузка
     char light2_smooth                [2]  = "0"                  ;
     char motion_pin                   [3]  = "14"                 ;
-    char dht_pin                      [3] =  "2"                  ;
+    char dht_pin                      [3] =  "13"                  ;
     char get_data_delay               [32] = "10"                 ;
     char publish_delay                [32] = "10"                 ;
     char subscribe_delay              [32] = "60"                 ;
@@ -100,8 +100,8 @@ class JsonConf
     char green_humidity_sensor_pin    [3]  = "20"                 ;
     char green_pump_pin               [3]  = "33"                 ;
 
-    char static_ip_enable             [2]  = "0"                  ;
-    char ntp_enable                   [2]  = "0"                  ;
+    char static_ip_enable             [2]  = "1"                  ;
+    char ntp_enable                   [2]  = "1"                  ;
     char mqtt_enable                  [2]  = "0"                  ;
     char bme280_enable                [2]  = "0"                  ;
     char sht21_enable                 [2]  = "0"                  ;
