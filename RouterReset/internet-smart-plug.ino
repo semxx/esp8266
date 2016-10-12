@@ -91,7 +91,8 @@ void connectToWifi() {
         Serial.println("can’t connect to wifi");
         cyclePower();
         delay(5000);
-        stopWifiAndReboot();
+        ESP.restart();
+        //stopWifiAndReboot();
       }
   }
   Serial.println("");
@@ -149,3 +150,4 @@ void cyclePower() {
   digitalWrite(GPIO, 1);
   Serial.println("turning plug on");
 }
+
