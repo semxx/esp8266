@@ -9,6 +9,7 @@
 #define BOTname "Neato"
 #define BOTusername "neatobot"
 
+
 #define GPIO 5
 
 const int REQUEST_TIMEOUT        = 5 * 1000;           // 5 seconds
@@ -36,7 +37,7 @@ static const char ntpServerName[] = "time.nist.gov";
 //static const char ntpServerName[] = "time-b.timefreq.bldrdoc.gov";
 //static const char ntpServerName[] = "time-c.timefreq.bldrdoc.gov";
 
-const int timeZone = 3;
+const int timeZone = +3;
 
 unsigned int localPort = 8888;  // local port to listen for UDP packets
 String timeString;
@@ -51,6 +52,7 @@ WiFiUDP Udp;
 WiFiClientSecure client;
 
 time_t getNtpTime();
+
 TelegramBOT bot(BOTtoken, BOTname, BOTusername);
 
 void fail(const char* msg) {
@@ -75,6 +77,7 @@ void connectToWifi() {
     i++;
     if (i > 50) {
         Serial.println("can’t connect to wifi");
+        markError();
         cyclePower();
         delay(5000);
         ESP.restart();
@@ -108,7 +111,27 @@ void stopWifiAndReboot() {
   ESP.restart();
 }
 
-
+void markError(){
+  Serial.println("Mark error.. Create err.txt"); 
+   String err = "1";
+  {
+    File out = SPIFFS.open("/err.txt", "w");
+    if (!out) {
+      fail("failed to open err.txt for writing");
+    }
+    out.print(err);
+  } 
+}
+void cleanError() {
+  Serial.println("send message and clean error.."); 
+ if (!SPIFFS.remove("/err.txt")) {
+        fail("remove failed");
+      }
+  else {
+        fail("err.txt has been removed");
+    }
+  
+  }
 boolean get(const char* host, const char* url) {
   WiFiClientSecure httpsClient;
   boolean status = false;
@@ -153,12 +176,13 @@ void setup() {
   delay(1000);
   Serial.println("");
   Serial.println("Internet Smart Plug");
-  connectToWifi();  
-
+  pinMode(LED_BLUE, OUTPUT);
+  pinMode(GPIO, OUTPUT);
+  digitalWrite(GPIO, 1);
   if (!SPIFFS.begin()) {
     fail("SPIFFS init failed");
   }
-
+  connectToWifi();  
   bot.begin();      // launch Bot functionalities
   
 /*  
@@ -181,10 +205,6 @@ void setup() {
   Serial.println("waiting for sync");
   setSyncProvider(getNtpTime);
   setSyncInterval(300);
- 
-  pinMode(LED_BLUE, OUTPUT);
-  pinMode(GPIO, OUTPUT);
-  digitalWrite(GPIO, 1);
   Serial.println("");
   Serial.println("Internet Smart Plug");
 
@@ -305,7 +325,7 @@ void setup() {
   Serial.println("success");
   */
 
-time_t prevDisplay = 0; // when the digital clock was displayed
+//time_t prevDisplay = 0; // when the digital clock was displayed
 
 /*
 String AddZero(String input) {
@@ -343,30 +363,32 @@ void GetTimeString()
 }
 
 void loop() {
-
+String result;
 boolean online;
-boolean isSend = false;
 unsigned short i = 0;
-if (!isSend) {
-    File in = SPIFFS.open("/tmp.txt", "r");
-    if (!in) {
-      fail("failed to open tmp.txt for reading");
-    }
-    Serial.printf("size=%d\r\n", in.size());
- //   if (in.size() != text.length()) {
- //     fail("invalid size of tmp.txt");
- if (in.size() > 0) {
 
-        Serial.print("Reading data: ");
+  {
+    File in = SPIFFS.open("/tmp.txt", "r");
+    if (in) {
         in.setTimeout(0);
-        String result = in.readString();
-        Serial.println(result); 
-        bot.sendMessage("161933663", result, "");
-        isSend = true;
-        delay(700);
-      }
+        result = in.readString();
+    }
+    else { 
+          fail("failed to open tmp.txt for reading");
+         }
+
   }
 
+{
+    File in = SPIFFS.open("/err.txt", "r");
+    if (in) {
+        cleanError();
+        bot.sendMessage("161933663", result, "");
+        delay(2000);
+        Serial.println("restarting");
+        ESP.restart();  
+    }
+}
 /* 
   {
     File in = SPIFFS.open("/tmp.txt", "r");
@@ -389,7 +411,7 @@ if (!isSend) {
 //      fail("invalid data in tmp.txt");
     }
 */
-if (isSend) {
+
   do {
     boolean check1 = get(CHECK_HOST1, CHECK_URL1);
     boolean check2 = get(CHECK_HOST2, CHECK_URL2);
@@ -404,14 +426,14 @@ if (isSend) {
  // get(MONITOR_HOST, online ? MONITOR_URL_UP : MONITOR_URL_DOWN);
 
   if (!online) {
+    markError();
     cyclePower();
     GetTimeString();
-
-  
+    
   } else {
-    Serial.println("nothing to do");
-  }
-}
+          Serial.println("nothing to do");
+          }
+
 /*
     text = timeString;
   {
