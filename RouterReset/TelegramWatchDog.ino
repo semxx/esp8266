@@ -12,6 +12,9 @@
 
 #define GPIO 2
 
+const char* WIFI_SSID            = "Xiaomi_2G";
+const char* WIFI_PASSWORD        = "panatorium";
+
 const int REQUEST_TIMEOUT        = 5 * 1000;           // 5 seconds
 //const int WAIT_TIME              = 6 * 60 * 60 * 1000; // 6 hours
 const int WAIT_TIME              = 1 * 60 * 1000; // 60 sec
@@ -20,44 +23,34 @@ const char* CHECK_HOST1          = "www.google.com";
 const char* CHECK_URL1           = "/";
 const char* CHECK_HOST2          = "fr.mappy.com";
 const char* CHECK_URL2           = "/";
-const char* MONITOR_HOST         = "yandex.ru";
-const char* MONITOR_URL_UP       = "/internet";
-const char* MONITOR_URL_DOWN     = "/maps";
+
 unsigned const int HTTPS_PORT = 443;
 
-//const char ssid[] = "Xiaomi_2G";  //  your network SSID (name)
-//const char pass[] = "panatorium";       // your network password
-
-const char* WIFI_SSID            = "Xiaomi_2G";
-const char* WIFI_PASSWORD        = "panatorium";
 // NTP Servers:
-//static const char ntpServerName[] = "us.pool.ntp.org";
-static const char ntpServerName[] = "time.nist.gov";
+static const char ntpServerName[] = "us.pool.ntp.org";
+//static const char ntpServerName[] = "time.nist.gov";
 //static const char ntpServerName[] = "time-a.timefreq.bldrdoc.gov";
 //static const char ntpServerName[] = "time-b.timefreq.bldrdoc.gov";
 //static const char ntpServerName[] = "time-c.timefreq.bldrdoc.gov";
 
 const int timeZone = 3;
-
 unsigned int localPort = 8888;  // local port to listen for UDP packets
 String timeString;
 String text;
 const int LED_BLUE = 2;
 
 void GetTimeString();
-void printDigits(int digits);
 void sendNTPpacket(IPAddress &address);
+time_t getNtpTime();
 
 WiFiUDP Udp;
 WiFiClientSecure client;
-
-time_t getNtpTime();
 
 TelegramBOT bot(BOTtoken, BOTname, BOTusername);
 
 void fail(const char* msg) {
   Serial.println(msg);
-  while (true) {
+    while (true) {
     yield();
   }
 }
@@ -81,7 +74,6 @@ void connectToWifi() {
         cyclePower();
         delay(5000);
         ESP.restart();
-        //stopWifiAndReboot();
       }
   }
   Serial.println("");
@@ -90,8 +82,8 @@ void connectToWifi() {
   Serial.println(WiFi.localIP());
   Serial.println("");
 }
-// Turn plug off then on
-void cyclePower() {
+
+void cyclePower() {     // Turn plug off then on
   Serial.println("turning plug off");
   digitalWrite(GPIO, 0);
   delay(5000);
@@ -102,7 +94,6 @@ void cyclePower() {
 void stopWifiAndReboot() {
   Serial.print("disabling WIFI then wait: ");
   Serial.println(WAIT_TIME);
-
   WiFi.mode(WIFI_OFF);
   WiFi.forceSleepBegin();
   delay(1); //Needed, at least in my tests WiFi doesn't power off without this for some reason
@@ -111,38 +102,49 @@ void stopWifiAndReboot() {
   ESP.restart();
 }
 
-void markError(){
-  Serial.println("Mark error.. Create err.txt"); 
-   String err = "1";
-  {
-    File out = SPIFFS.open("/err.txt", "w");
-    if (!out) {
-      fail("failed to open err.txt for writing");
-    }
-    out.print(err);
-  } 
-}
 void createFile(){
   Serial.println("Create tmp.txt"); 
    String err = "1";
   {
     File out = SPIFFS.open("/tmp.txt", "w");
     if (!out) {
-      fail("failed to open tmp.txt for writing");
+      Serial.println("failed to open tmp.txt for writing");
     }
     out.print(err);
   } 
 }
+
+void markError(){
+  Serial.println("Mark error.. Create err.txt"); 
+   String err = "1";
+  {
+    File out = SPIFFS.open("/err.txt", "w");
+    if (!out) {
+     Serial.println("failed to open err.txt for writing");
+    }
+    out.print(err);
+  } 
+}
+
 void cleanError() {
  
  if (!SPIFFS.remove("/err.txt")) {
-        fail("remove failed");
+        Serial.println("remove failed");
       }
   else {
-        fail("err.txt has been removed");
+        Serial.println("err.txt has been removed");
     }
   
   }
+void UpdateTelegramMessageFile() {
+    GetTimeString();
+    String text = timeString;
+      File out = SPIFFS.open("/tmp.txt", "w");
+      out.print(text);
+      Serial.println("Sucsessfully updated time for Telegram");
+      Serial.println(text);
+  }
+  
 boolean get(const char* host, const char* url) {
   WiFiClientSecure httpsClient;
   boolean status = false;
@@ -184,43 +186,26 @@ boolean get(const char* host, const char* url) {
   return status;
 }
 void setup() {
-  Serial.begin(115200);
-  delay(1000);
-  Serial.println("");
-  Serial.println("Internet Smart Plug");
-  pinMode(LED_BLUE, OUTPUT);
-  pinMode(GPIO, OUTPUT);
-  digitalWrite(GPIO, 1);
-  if (!SPIFFS.begin()) {
-    fail("SPIFFS init failed");
-  }
-  connectToWifi();  
-  bot.begin();      // launch Bot functionalities
-  
-/*  
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-  WiFi.begin(ssid, pass);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-
-  Serial.print("IP number assigned by DHCP is ");
-  Serial.println(WiFi.localIP());
-  Serial.println("Starting UDP");
-*/
-  Udp.begin(localPort);
-  Serial.print("Local port: ");
-  Serial.println(Udp.localPort());
-  Serial.println("waiting for sync");
-  setSyncProvider(getNtpTime);
-  setSyncInterval(300);
-  Serial.println("");
-  Serial.println("Internet Smart Plug");
-
-
+                Serial.begin(115200);
+                delay(1000);
+                Serial.println("");
+                Serial.println("Internet Smart Plug");
+                pinMode(LED_BLUE, OUTPUT);
+                pinMode(GPIO, OUTPUT);
+                digitalWrite(GPIO, 1);
+                if (!SPIFFS.begin()) {
+                  fail("SPIFFS init failed");
+                }
+                connectToWifi();  
+                bot.begin();      // launch Bot functionalities
+                Udp.begin(localPort);
+                Serial.print("Local port: ");
+                Serial.println(Udp.localPort());
+                Serial.println("waiting for sync");
+                setSyncProvider(getNtpTime);
+                setSyncInterval(300);
+                Serial.println("");
+                Serial.println("Internet Smart Plug");
   }
 
 /*  
@@ -339,40 +324,58 @@ void setup() {
 
 //time_t prevDisplay = 0; // when the digital clock was displayed
 
-/*
-String AddZero(String input) {
-      String s = input;
-  //  Serial.print("Input value in function replace: ");
-  //  Serial.println(s);
-    s.replace("0", "00");
-    s.replace("1", "01");
-    s.replace("2", "02");
-    s.replace("3", "03");
-    s.replace("4", "04");
-    s.replace("5", "05");
-    s.replace("6", "06");
-    s.replace("7", "07");
-    s.replace("8", "09");
-    s.replace("9", "09");
 
-  return s;
-}
-*/
-void GetTimeString()
-{
-  timeString = "";
-  timeString += year();
-  timeString += ".";
-  timeString += month();
-  timeString += ".";
-  timeString += day();
-  timeString += " ";
-  timeString += hour();
-  timeString += ":";  
-  timeString += minute();
-  timeString += ":";
-  timeString += second();
-}
+String AddZero(String input) {
+    String s = input;
+       if (s.length()== 1) {   
+      
+          s.replace("0", "00");
+          s.replace("1", "01");
+          s.replace("2", "02");
+          s.replace("3", "03");
+          s.replace("4", "04");
+          s.replace("5", "05");
+          s.replace("6", "06");
+          s.replace("7", "07");
+          s.replace("8", "09");
+          s.replace("9", "09");
+          return s;
+          }
+          else  {
+                   return s; 
+                }
+    }
+
+void GetTimeString() {
+int checkYear = year();
+String mnt = "";
+String scd = "";
+
+mnt += minute();
+scd += second();
+
+
+
+  if (checkYear != 1970) {
+    
+      timeString = "";
+      
+      timeString += year();
+      timeString += "/";
+      timeString += month();
+      timeString += "/";
+      timeString += day();
+      timeString += " ";
+      timeString += hour();
+      timeString += ":";  
+      timeString += AddZero(mnt);
+      timeString += ":";
+      timeString += AddZero(scd);
+    }
+    else { Serial.println("Can not get correct date/time from NTP server");
+         }
+  }
+
 
 void loop() {
 String result;
@@ -387,7 +390,6 @@ unsigned short i = 0;
     }
     else { 
           fail("failed to open tmp.txt for reading");
-          createFile();
          }
 
   }
@@ -395,10 +397,12 @@ unsigned short i = 0;
 {
     File in = SPIFFS.open("/err.txt", "r");
     if (in) {
-       // cleanError();
+
         Serial.println("send message.."); 
+        Serial.println(result); 
         bot.sendMessage("161933663", result, "");
-        Serial.println("send message complete.."); 
+        Serial.println("send message complete..");
+        cleanError(); 
         delay(2000);
         Serial.println("restarting");
         ESP.restart();  
@@ -418,7 +422,8 @@ unsigned short i = 0;
         Serial.print("Reading data: ");
         in.setTimeout(0);
         String result = in.readString();
-        Serial.println(result);        yield();
+        Serial.println(result);        
+        yield();
         bot.sendMessage("161933663", result, "");
         yield();
       }
@@ -439,14 +444,16 @@ unsigned short i = 0;
   Serial.println("");
 
  // get(MONITOR_HOST, online ? MONITOR_URL_UP : MONITOR_URL_DOWN);
-
+    GetTimeString();
+    
   if (!online) {
     markError();
     cyclePower();
-    GetTimeString();
+    stopWifiAndReboot();
     
   } else {
           Serial.println("nothing to do");
+          UpdateTelegramMessageFile();
           }
 
 /*
