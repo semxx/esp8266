@@ -9,6 +9,8 @@
 #define BOTname "Neato"
 #define BOTusername "neatobot"
 
+long hystyresis = 10 * 60 * 1000; // 30 min
+long lasttime;   //last time messages' scan has been done
 
 #define GPIO 2
 
@@ -16,7 +18,7 @@ const char* WIFI_SSID            = "Xiaomi_2G";
 const char* WIFI_PASSWORD        = "panatorium";
 
 const int REQUEST_TIMEOUT        = 5 * 1000;           // 5 seconds
-//const int WAIT_TIME              = 6 * 60 * 60 * 1000; // 6 hours
+//const int WAIT_TIME            = 6 * 60 * 60 * 1000; // 6 hours
 const int WAIT_TIME              = 1 * 60 * 1000; // 60 sec
 const int MAX_TRIES              = 1;
 const char* CHECK_HOST1          = "www.google.com";
@@ -103,27 +105,33 @@ void stopWifiAndReboot() {
 }
 
 void createFile(){
-  Serial.println("Create tmp.txt"); 
    String err = "1";
+    File out = SPIFFS.open("/tmp.txt", "r");
   {
-    File out = SPIFFS.open("/tmp.txt", "w");
     if (!out) {
-      Serial.println("failed to open tmp.txt for writing");
-    }
+    File out = SPIFFS.open("/tmp.txt", "w");
     out.print(err);
+    Serial.println("File tmp.txt has been created sucsessfully!"); 
+    }
+    else {
+    Serial.println("File tmp.txt allready exist!"); 
+      }
   } 
 }
 
 void markError(){
-  Serial.println("Mark error.. Create err.txt"); 
    String err = "1";
-  {
-    File out = SPIFFS.open("/err.txt", "w");
+    File out = SPIFFS.open("/err.txt", "r");
+   {  
     if (!out) {
-     Serial.println("failed to open err.txt for writing");
-    }
+    File out = SPIFFS.open("/err.txt", "w");
     out.print(err);
-  } 
+    Serial.println("Mark error sucsessfully!"); 
+   }
+    else {
+    Serial.println("Error markeded before!"); 
+    } 
+  }
 }
 
 void cleanError() {
@@ -208,137 +216,19 @@ void setup() {
                 Serial.println("Internet Smart Plug");
   }
 
-/*  
-  {
-
-    Serial.println("\n\nFS test\n");
-    if (!SPIFFS.format()) {
-      fail("format failed");
-    }
-    Dir root = SPIFFS.openDir("/");
-    int count = 0;
-    while (root.next()) {
-      ++count;
-    }
-    if (count > 0) {
-      fail("some files left after format");
-    }
-  }
-*/
-
-
-/*
-  String text = "write test";
-  {
-    File out = SPIFFS.open("/tmp.txt", "w");
-    if (!out) {
-      fail("failed to open tmp.txt for writing");
-    }
-    out.print(text);
-  }
-
-  {
-    File in = SPIFFS.open("/tmp.txt", "r");
-    if (!in) {
-      fail("failed to open tmp.txt for reading");
-    }
-    Serial.printf("size=%d\r\n", in.size());
-    if (in.size() != text.length()) {
-      fail("invalid size of tmp.txt");
-    }
-    Serial.print("Reading data: ");
-    in.setTimeout(0);
-    String result = in.readString();
-    Serial.println(result);
-    if (result != text) {
-      fail("invalid data in tmp.txt");
-    }
-  }
-
-  {
-    for (int i = 0; i < 10; ++i) {
-      String name = "seq_";
-      name += i;
-      name += ".txt";
-
-      File out = SPIFFS.open(name, "w");
-      if (!out) {
-        fail("can't open seq_ file");
-      }
-
-      out.println(i);
-    }
-  }
-  {
-    Dir root = SPIFFS.openDir("/");
-    while (root.next()) {
-      String fileName = root.fileName();
-      File f = root.openFile("r");
-      Serial.printf("%s: %d\r\n", fileName.c_str(), f.size());
-    }
-  }
-
-  {
-    Dir root = SPIFFS.openDir("/");
-    while (root.next()) {
-      String fileName = root.fileName();
-      Serial.print("deleting ");
-      Serial.println(fileName);
-      if (!SPIFFS.remove(fileName)) {
-        fail("remove failed");
-      }
-    }
-  }
-
-  {
-    File tmp = SPIFFS.open("/tmp1.txt", "w");
-    tmp.println("rename test");
-  }
-
-  {
-    if (!SPIFFS.rename("/tmp1.txt", "/tmp2.txt")) {
-      fail("rename failed");
-    }
-    File tmp2 = SPIFFS.open("/tmp2.txt", "r");
-    if (!tmp2) {
-      fail("open tmp2 failed");
-    }
-  }
-
-  {
-    if (!SPIFFS.format()) {
-      fail("format failed");
-    }
-    Dir root = SPIFFS.openDir("/");
-    int count = 0;
-    while (root.next()) {
-      ++count;
-    }
-    if (count > 0) {
-      fail("some files left after format");
-    }
-  }
-
-  Serial.println("success");
-  */
-
-//time_t prevDisplay = 0; // when the digital clock was displayed
-
-
 String AddZero(String input) {
     String s = input;
        if (s.length()== 1) {   
-      
-          s.replace("0", "00");
-          s.replace("1", "01");
-          s.replace("2", "02");
-          s.replace("3", "03");
-          s.replace("4", "04");
-          s.replace("5", "05");
-          s.replace("6", "06");
-          s.replace("7", "07");
-          s.replace("8", "09");
-          s.replace("9", "09");
+           s.replace("0", "00");
+           s.replace("1", "01");
+           s.replace("2", "02");
+           s.replace("3", "03");
+           s.replace("4", "04");
+           s.replace("5", "05");
+           s.replace("6", "06");
+           s.replace("7", "07");
+           s.replace("8", "09");
+           s.replace("9", "09");
           return s;
           }
           else  {
@@ -347,39 +237,37 @@ String AddZero(String input) {
     }
 
 void GetTimeString() {
-int checkYear = year();
-String mnt = "";
-String scd = "";
+  int checkYear = year();
+  String mnt = "";
+  String scd = "";
 
-mnt += minute();
-scd += second();
-
-
-
-  if (checkYear != 1970) {
-    
-      timeString = "";
-      
-      timeString += year();
-      timeString += "/";
-      timeString += month();
-      timeString += "/";
-      timeString += day();
-      timeString += " ";
-      timeString += hour();
-      timeString += ":";  
-      timeString += AddZero(mnt);
-      timeString += ":";
-      timeString += AddZero(scd);
-    }
-    else { Serial.println("Can not get correct date/time from NTP server");
-         }
+  mnt += minute();
+  scd += second();
+ 
+    if (checkYear != 1970) {
+        timeString = "";
+        timeString += year();
+        timeString += "/";
+        timeString += month();
+        timeString += "/";
+        timeString += day();
+        timeString += " ";
+        timeString += hour();
+        timeString += ":";  
+        timeString += AddZero(mnt);
+        timeString += ":";
+        timeString += AddZero(scd);
+      }
+      else { Serial.println("Can not get correct date/time from NTP server");
+           }
   }
 
 
 void loop() {
 String result;
+String messg;
 boolean online;
+boolean getTime = false;
 unsigned short i = 0;
 
   {
@@ -400,7 +288,15 @@ unsigned short i = 0;
 
         Serial.println("send message.."); 
         Serial.println(result); 
-        bot.sendMessage("161933663", result, "");
+        messg += result;
+        messg += " Smart Plug WatchDog is down :-(";
+        bot.sendMessage("161933663", messg, "");
+        yield();
+        GetTimeString();
+        yield();
+        messg = timeString;
+        messg += " Smart Plug WatchDog sucsessfully up!";
+        bot.sendMessage("161933663", messg, "");
         Serial.println("send message complete..");
         cleanError(); 
         delay(2000);
@@ -408,29 +304,6 @@ unsigned short i = 0;
         ESP.restart();  
     }
 }
-/* 
-  {
-    File in = SPIFFS.open("/tmp.txt", "r");
-    if (!in) {
-      fail("failed to open tmp.txt for reading");
-    }
-    Serial.printf("size=%d\r\n", in.size());
- //   if (in.size() != text.length()) {
- //     fail("invalid size of tmp.txt");
- if (in.size() > 0) {
-
-        Serial.print("Reading data: ");
-        in.setTimeout(0);
-        String result = in.readString();
-        Serial.println(result);        
-        yield();
-        bot.sendMessage("161933663", result, "");
-        yield();
-      }
-//    if (result != text) {
-//      fail("invalid data in tmp.txt");
-    }
-*/
 
   do {
     boolean check1 = get(CHECK_HOST1, CHECK_URL1);
@@ -443,31 +316,28 @@ unsigned short i = 0;
   Serial.println(online ? "OK" : "KO");
   Serial.println("");
 
- // get(MONITOR_HOST, online ? MONITOR_URL_UP : MONITOR_URL_DOWN);
-    GetTimeString();
-    
+  
   if (!online) {
     markError();
     cyclePower();
     stopWifiAndReboot();
     
   } else {
-          Serial.println("nothing to do");
-          UpdateTelegramMessageFile();
+          GetTimeString();
+         //     if (millis() > lasttime + hystyresis || !getTime )  {
+                  UpdateTelegramMessageFile();
+
+             // }
+
           }
 
-/*
-    text = timeString;
-  {
-    File out = SPIFFS.open("/tmp.txt", "w");
-    if (!out) {
-      fail("failed to open tmp.txt for writing");
-    }
-    out.print(text);
-  }
-  stopWifiAndReboot();
-*/
 delay(10000);
+//                  getTime = true;
+//                  lasttime = millis();
+//              else {
+//                Serial.println("Wait for hysteresis time for UpdateTelegramMessageFile()");
+//                Serial.println(getTime);
+//                }
 }
 
 /*-------- NTP code ----------*/
