@@ -1,27 +1,31 @@
 #ifndef JSON_CONFIG_H
 #define JSON_CONFIG_H
 
-#include <Arduino.h>
-#include <ArduinoJson.h>
+#include "Arduino.h"
+#include "ArduinoJson.h"
 #include "FS.h"
 
 
-//#define DHT_ON
+// --------------- Supported Sensors (Uncomment for Enable) -------------------
+#define DHT_ON
 //#define BME280_ON
 #define SHT21_ON
+#define BH1750_ON
+//#define PZEM_ON
+//-----------------------------------------------------------------------------
 
 #define DEBUG
 #define DEBUG_JSON_CONFIG
 
-
+#define RESET_BUTTON_ON   //Функционал сброса конфига по кнопке при загрузке модуля
 //#define REBOOT_ON
+#define NTP_ON
 
-//UART Settings    ------------------------------------------------------------
+// ----------------- UART Settings ---------------------------------------------
 
 //#define UART_ON
-
-#define DEBUG_ESP_UART
-#define CRC_ENABLE
+//#define DEBUG_ESP_UART
+//#define CRC_ENABLE
 
 #define DIGITAL_PINS 14   //Кол-во цифровых входов/выходов
 #define ANALOG_PINS 6     //Кол-во цифровых входов/выходов
@@ -37,13 +41,14 @@ enum WIFI_MODE_ENUM {AP, STA, AP_STA};
 enum WIFI_PHY_MODE_ENUM {B, G, N};
 enum WIFI_AUTH_ENUM {OPEN, WPA_PSK, WPA2_PSK, WPA_WPA2_PSK};
 
-
+const String ConfigFileName = "/conf.json";
 
 class JsonConf
 {
   public:
     bool saveConfig();
     bool loadConfig();
+    void deleteConfig();
     bool printConfig();
 
     char module_id                    [32] = "ESP8266"            ;
@@ -59,10 +64,10 @@ class JsonConf
     char static_subnet                [16] = "255.255.255.0"      ;
     char ntp_server                   [32] = "europe.pool.ntp.org";
     char my_time_zone                 [4]  = "+3"                 ;
-    char mqtt_server                  [32] = "10.10.10.50"      ;
+    char mqtt_server                  [32] = "10.10.10.25"      ;
     char mqtt_port                    [6]  = "1883"               ;
-    char mqtt_user                    [32] = "user"               ;
-    char mqtt_pwd                     [32] = "user"               ;
+    char mqtt_user                    [32] = "admin"               ;
+    char mqtt_pwd                     [32] = "admin"               ;
     char mqtt_name                    [32] = "_BedM"              ;
     char publish_topic                [32] = "/stateSub/"         ;
     char subscribe_topic              [32] = "/statePub/"         ;
@@ -75,6 +80,7 @@ class JsonConf
     char light2off_delay              [32] = "5"                  ;
     char light2on_lux                 [6]  = "10"                 ; // Значение в люксах, ниже которого будет включаться нагрузка
     char light2_smooth                [2]  = "0"                  ;
+    char reset_pin                    [3]  = "2"                  ;
     char motion_pin                   [3]  = "14"                 ;
     char dht_pin                      [3] =  "12"                  ;
     char get_data_delay               [32] = "10"                 ;
@@ -97,13 +103,16 @@ class JsonConf
     char green_humidity_sensor_pin    [3]  = "20"                 ;
     char green_pump_pin               [3]  = "33"                 ;
 
-    char static_ip_enable             [2]  = "1"                  ;
-    char ntp_enable                   [2]  = "1"                  ;
-    char mqtt_enable                  [2]  = "1"                  ;
+    char static_ip_enable             [2]  = "0"                  ;
+    char ntp_enable                   [2]  = "0"                  ;
+    char mqtt_enable                  [2]  = "0"                  ;
+    char mqtt_auth_enable             [2]  = "0"                  ;
+    char dht_enable                   [2]  = "0"                  ;
     char bme280_enable                [2]  = "0"                  ;
     char sht21_enable                 [2]  = "0"                  ;
-    char bh1750_enable                [2]  = "1"                  ;
-    char motion_sensor_enable         [2]  = "1"                  ;
+    char bh1750_enable                [2]  = "0"                  ;
+    char motion_sensor_enable         [2]  = "0"                  ;
+    char pzem_enable                  [2]  = "0"                  ;
 
 
   private:
