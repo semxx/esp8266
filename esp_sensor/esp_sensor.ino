@@ -1,52 +1,73 @@
-#include <ESP8266WiFi.h>
-//#include <WiFiClientSecure.h>
-//#include <ESP8266TelegramBOT.h>
-
-//#include <ESP8266mDNS.h>
-#include <ESP8266WebServer.h>
-#include <RCSwitch.h>
-#include <livolo.h>
+#include "ESP8266WiFi.h"
+#include "WiFiUdp.h"
+#include "ESP8266WebServer.h"
 extern "C" {
 #include "user_interface.h"
 }
 
-#include <PubSubClient.h>
-#include <Wire.h>
-#include "SPI.h"
-#include <BH1750.h>
-#include <NTPClient.h>
-#include <WiFiUdp.h>
+#include "Adafruit_MQTT.h"
+#include "Adafruit_MQTT_Client.h"
 #include "json_config.h"
-#include <ArduinoJson.h>
+#include "ArduinoJson.h"
+
+#include "SimpleTimer.h"
+SimpleTimer timer;
+
+#include <RCSwitch.h>
+#include <livolo.h>
+
+#if defined(NTP_ON)
+  #include "NTPClient.h"
+  WiFiUDP ntpUDP;
+  NTPClient timeClient(ntpUDP);
+#endif
 
 #if defined(UART_ON)
-#include "MY_ESP_UART.h"
-Espuart Uart;
+  #include "MY_ESP_UART.h"
+  Espuart Uart;
 #endif
 
 JsonConf JConf;
 
 #if defined(DHT_ON)
-#include "DHT.h"
-#define DHTTYPE DHT22
-DHT dht(atoi(JConf.dht_pin), DHTTYPE);
-int errorDHTdata = 0;  // количество ошибок чтения датчика DHT
+  #include <DHT.h>
+  // Uncomment the type of sensor in use:
+  //#define DHTTYPE           DHT11     // DHT 11 
+  #define DHTTYPE           DHT22     // DHT 22 (AM2302)
+  //#define DHTTYPE           DHT21     // DHT 21 (AM2301)
+  DHT dht(atoi(JConf.dht_pin), DHTTYPE);
+#endif
+
+#if defined(BH1750_ON)
+  #include "BH1750.h"
+  BH1750 lightSensor;
 #endif
 
 #if defined(BME280_ON)
-#include "SparkFunBME280.h"
-BME280 bmeSensor;
+  #include "SparkFunBME280.h"
+  BME280 bmeSensor;
 #endif
 
 #if defined(SHT21_ON)
-#include <HTU21D.h>
-HTU21D myHTU21D;
+  #include "HTU21D.h"
+  HTU21D myHTU21D;
+#endif
+
+#if defined(PZEM_ON)
+  #include "PZEM004T.h"
+  PZEM004T pzem(&Serial);
+  IPAddress ip_pzem(192,168,1,1);
+  float coil_ratio = 1.84; // Если используем разные катушки, подбираем коэффициент
+  enum PZEM_ENUM {PZEM_VOLTAGE, PZEM_CURRENT, PZEM_POWER, PZEM_ENERGY};
+  PZEM_ENUM pzem_current_read = PZEM_VOLTAGE;
+  enum PZEM_RESET_ENUM {PZEM_STAGE1, PZEM_STAGE2, PZEM_STAGE3, PZEM_STAGE4};
+  PZEM_RESET_ENUM pzem_reset_stage = PZEM_STAGE1;
 #endif
 
 ADC_MODE(ADC_VCC);
 float voltage_float;
 
-const char *ver                = "1.08"              ;         
+const char *ver                = "1.09"              ;         
 
 const char *lux                = "Lux"               ;        
 const char *lightType          = "LightType"         ;              
@@ -56,37 +77,56 @@ const char *humidity           = "Humidity"          ;
 const char *pressure           = "Pressure"          ;             
 const char *altitude           = "Altitude"          ;             
 const char *motionSensor       = "MotionSensor"      ;                 
-const char *motionsensortimer  = "MotionSensorTimer" ;                      
-const char *motionsensortimer2 = "MotionSensorTimer2";                       
+const char *motionSensorTimer  = "MotionSensorTimer" ;                      
+const char *motionSensorTimer2 = "MotionSensorTimer2";                       
 const char *version            = "Version"           ;            
 const char *freeMemory         = "FreeMemory"        ;               
 const char *ip                 = "IP"                ;       
 const char *mac                = "MAC"               ;        
-const char *errorsDHT          = "ErrorsDHT"         ;              
 const char *uptime             = "Uptime"            ;           
+const char *pzemVoltage        = "pzemVoltage"       ;           
+const char *pzemCurrent        = "pzemCurrent"       ;           
+const char *pzemPower          = "pzemPower"         ;           
+const char *pzemEnergy         = "pzemEnergy"        ;           
+const char *pzemReset          = "pzemReset"         ;           
 
 const char sec[] PROGMEM = "sec";
-
 
 String temperatureString = "none";
 String pressureString =    "none";
 String humidityString =    "none";
 String luxString =         "none";
-String WiFiRSSIString =     "none";
+String WiFiRSSIString =    "none";
 String ipString =          "none";
 String macString =         "none";
 String uptimeString =      "none";
 String ntpTimeString =     "none";
 String freeMemoryString =  "none";
-String lightState =        "AUTO";
-String lightState2 =       "AUTO";
+String lightState =        "OFF";
+String lightState2 =       "OFF";
+String pzemVoltageString = "none";
+String pzemCurrentString = "none";
+String pzemPowerString =   "none";
+String pzemEnergyString =  "none";
 
-WiFiUDP ntpUDP;
-BH1750 lightSensor;
-PubSubClient mqttClient;
-Livolo livolo(5);
+long Day=0;
+int Hour =0;
+int Minute=0;
+int Second=0;
+int HighMillis=0;
+int Rollover=0;
+
+int wifiReconnectTimer = 0;
+int rebootTimer = 0;
+int subscribeTimer = 0;
+
+unsigned long lightOffTimer = 0;
+unsigned long lightOffTimer2 = 0;
+
+bool motionDetect = false;
+bool wifiSafeMode = false;
+
 WiFiClient espClient;
-NTPClient timeClient(ntpUDP,JConf.ntp_server, atoi(JConf.my_time_zone) * 60 * 60, 60000);
 RCSwitch mySwitch = RCSwitch();
 
 //Socket 1416
@@ -105,35 +145,78 @@ char* socket12TriStateOff = "0FFFFFFF1010";
 char* socket13TriStateOn  = "0FFFFFF10001";
 char* socket13TriStateOff = "0FFFFFF10010";
 
-long Day=0;
-int Hour =0;
-int Minute=0;
-int Second=0;
-int HighMillis=0;
-int Rollover=0;
 
-unsigned long getDataTimer = 0;
-unsigned long publishTimer = 2000;
-unsigned long motionTimer = 4000;
-unsigned long rebootTimer = 6000;
-unsigned long subscribeTimer = (atoi(JConf.subscribe_delay) *1000UL) - 5000UL;
-unsigned long lightOffTimer = 0;
-unsigned long lightOffTimer2 = 0;
-unsigned long wifiSafeModeReconnectTimer = 0;
- 
-unsigned long wifiSafeModeReconnectDelay=600000;
- 
-bool motionDetect = false;
-bool wifiSafeMode = false;
+Adafruit_MQTT_Client mqtt = Adafruit_MQTT_Client(&espClient, JConf.mqtt_server, atoi(JConf.mqtt_port), JConf.mqtt_user, JConf.mqtt_pwd);
+
+Adafruit_MQTT_Publish pubTopicLightType = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+Adafruit_MQTT_Publish pubTopicLightType2 = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+Adafruit_MQTT_Publish pubTopicMotionSensor = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+Adafruit_MQTT_Publish pubTopicMotionSensorTimer = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+Adafruit_MQTT_Publish pubTopicMotionSensorTimer2 = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+
+Adafruit_MQTT_Publish pubTopicLux = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+Adafruit_MQTT_Publish pubTopicTemperature = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+Adafruit_MQTT_Publish pubTopicHumidity = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+Adafruit_MQTT_Publish pubTopicPressure = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+
+Adafruit_MQTT_Publish pubTopicPzemVoltage = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+Adafruit_MQTT_Publish pubTopicPzemCurrent = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+Adafruit_MQTT_Publish pubTopicPzemPower = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+Adafruit_MQTT_Publish pubTopicPzemEnergy = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+
+Adafruit_MQTT_Publish pubTopicFreeMemory = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+Adafruit_MQTT_Publish pubTopicUptime = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+Adafruit_MQTT_Publish pubTopicVersion = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+Adafruit_MQTT_Publish pubTopicIp = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+Adafruit_MQTT_Publish pubTopicMac = Adafruit_MQTT_Publish(&mqtt, JConf.publish_topic);
+
+
+Adafruit_MQTT_Subscribe subTopicMotionSensorTimer = Adafruit_MQTT_Subscribe(&mqtt, JConf.command_pub_topic);
+Adafruit_MQTT_Subscribe subTopicMotionSensorTimer2 = Adafruit_MQTT_Subscribe(&mqtt, JConf.command_pub_topic);
+
+Adafruit_MQTT_Subscribe subTopicLightType = Adafruit_MQTT_Subscribe(&mqtt, JConf.command_pub_topic);
+Adafruit_MQTT_Subscribe subTopicLightType2 = Adafruit_MQTT_Subscribe(&mqtt, JConf.command_pub_topic);
+
+Adafruit_MQTT_Subscribe subTopicUptime = Adafruit_MQTT_Subscribe(&mqtt, JConf.command_pub_topic);
+
+Adafruit_MQTT_Subscribe subTopicPzemReset = Adafruit_MQTT_Subscribe(&mqtt, JConf.command_pub_topic);
 
 
 char topic_buff[120];
 char value_buff[120];
 
+char lightType_buff[50];
+char lightType2_buff[50];
+char motionSensor_buff[50];
+char motionSensorTimer_buff[50];
+char motionSensorTimer2_buff[50];
+char lux_buff[50];
+char temperature_buff[50];
+char humidity_buff[50];
+char pressure_buff[50];
+char pzemVoltage_buff[50];
+char pzemCurrent_buff[50];
+char pzemPower_buff[50];
+char pzemEnergy_buff[50];
+char freeMemory_buff[50];
+char uptime_buff[50];
+char version_buff[50];
+char ip_buff[50];
+char mac_buff[50];
+
+char motionSensorTimer_buff_sub[50];
+char motionSensorTimer2_buff_sub[50];
+char lightType_buff_sub[50];
+char lightType2_buff_sub[50];
+char uptime_buff_sub[50];
+char pzemReset_buff_sub[50];
+
+
+
+
 String network_html;          // Список доступных Wi-Fi точек
 
 ESP8266WebServer WebServer(80);
-
 
 int cycleNow[ESP_PINS];
 int cycleEnd[ESP_PINS];
@@ -141,56 +224,8 @@ int cycleEnd[ESP_PINS];
 unsigned long timerDigitalPin[ESP_PINS];
 int delayDigitalPin = 10;
 
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////         HTML SNIPPLETS
-
-/*
-String headerStart;           headerStart += FPSTR(headerStartP);
-String headerRefreshStatus;   headerRefreshStatus += FPSTR(headerRefreshStatusP);
-String headerEnd;             headerEnd += FPSTR(headerEndP);
-String javaScript;            javaScript += FPSTR(javaScriptP);
-String javaScriptEnd;         javaScriptEnd += FPSTR(javaScriptEndP);
-String bodyAjax;              bodyAjax += FPSTR(bodyAjaxP);
-String bodyNonAjax;           bodyNonAjax += FPSTR(bodyNonAjaxP);
-String navbarStart;           navbarStart += FPSTR(navbarStartP);
-String navbarNonActive;       navbarNonActive += FPSTR(navbarNonActiveP);
-String navbarActive;          navbarActive += FPSTR(navbarActiveP);
-String navbarEnd;             navbarEnd += FPSTR(navbarEndP);
-String containerStart;        containerStart += FPSTR(containerStartP);
-String containerEnd;          containerEnd += FPSTR(containerEndP);
-String siteEnd;               siteEnd += FPSTR(siteEndP);
-String panelHeaderName;       panelHeaderName += FPSTR(panelHeaderNameP);
-String panelHeaderEnd;        panelHeaderEnd += FPSTR(panelHeaderEndP);
-String panelEnd;              panelEnd += FPSTR(panelEndP);
-String panelBodySymbol;       panelBodySymbol += FPSTR(panelBodySymbolP);
-String panelBodyName;         panelBodyName += FPSTR(panelBodyNameP);
-String panelBodyValue;        panelBodyValue += FPSTR(panelBodyValueP);
-String closingAngleBracket;   closingAngleBracket += FPSTR(closingAngleBracketP);
-
-String panelBodyEnd;          panelBodyEnd += FPSTR(panelBodyEndP);
-
-String inputBodyStart;        inputBodyStart += FPSTR(inputBodyStartP);
-String inputBodyName;         inputBodyName += FPSTR(inputBodyNameP);
-String inputBodyPOST;         inputBodyPOST += FPSTR(inputBodyPOSTP);
-String inputPlaceHolder;      inputPlaceHolder += FPSTR(inputPlaceHolderP);
-String inputBodyClose;        inputBodyClose += FPSTR(inputBodyCloseP);
-String inputBodyCloseDiv;     inputBodyCloseDiv += FPSTR(inputBodyCloseDivP);
-String inputBodyUnitStart;    inputBodyUnitStart += FPSTR(inputBodyUnitStartP);
-String inputBodyUnitEnd;      inputBodyUnitEnd += FPSTR(inputBodyUnitEndP);
-String inputBodyEnd;          inputBodyEnd += FPSTR(inputBodyEndP);
-
-String sketchUploadForm;      sketchUploadForm += FPSTR(sketchUploadFormP);
-
-String ClassInfo;       ClassInfo += FPSTR(ClassInfoP);
-String ClassDanger;     ClassDanger += FPSTR(ClassDangerP);
-String ClassDefault;    ClassDefault += FPSTR(ClassDefaultP);
-String ClassSuccess;    ClassSuccess += FPSTR(ClassSuccessP);
-
-String AUTO;       AUTO += FPSTR(AUTOP);
-String ON;         ON += FPSTR(ONP);
-String OFF;        OFF += FPSTR(OFFP);
-
-
-*/
 
 const char headerStartP[] PROGMEM = "<html lang='en'><head><title>";
 //JConf.module_id
@@ -276,9 +311,10 @@ const char div1P[] PROGMEM =
     <td class='active'><h4>Pins</h4></td>\
     <td class='active'></td><td class='active'></td>\
     <td class='active'><h4>Status</h4></td>\
-    <td class='active'><h4>Mode</h4></td>\
-    <td class='active'><h4>Timer</h4></td>\
-  </tr>\
+    <td class='active'><h4>Mode</h4></td>";
+
+const char div2P[] PROGMEM =
+ "</tr>\
   <tr>\
     <td class='active'><h4>Light1</h4></td>\
     <td class='active'><div onclick='Pin1();'><input id='OnOff' type='submit' class='btn btn-";
@@ -357,6 +393,23 @@ message = xmldoc[0].firstChild.nodeValue;\
 document.getElementById('pressureId').innerHTML=message;";
 
 
+#if defined(PZEM_ON)
+const char jsPzemP[] PROGMEM = 
+"xmldoc = xmlResponse.getElementsByTagName('pzemVoltage');\
+message = xmldoc[0].firstChild.nodeValue;\
+document.getElementById('pzemVoltageId').innerHTML=message;\
+xmldoc = xmlResponse.getElementsByTagName('pzemCurrent');\
+message = xmldoc[0].firstChild.nodeValue;\
+document.getElementById('pzemCurrentId').innerHTML=message;\
+xmldoc = xmlResponse.getElementsByTagName('pzemPower');\
+message = xmldoc[0].firstChild.nodeValue;\
+document.getElementById('pzemPowerId').innerHTML=message;\
+xmldoc = xmlResponse.getElementsByTagName('pzemEnergy');\
+message = xmldoc[0].firstChild.nodeValue;\
+document.getElementById('pzemEnergyId').innerHTML=message;";
+#endif
+
+
 const char jsNtpP[] PROGMEM = 
 "xmldoc = xmlResponse.getElementsByTagName('ntpTime');\
 message = xmldoc[0].firstChild.nodeValue;\
@@ -406,9 +459,6 @@ const char navbarEndP[] PROGMEM =
 <li><a href='/espconf'>ESP</a></li>\
 <li><a href='/mqttconf'>MQTT</a></li>\
 <li><a href='/ntpconf'>NTP time</a></li>\
-<li><a href='/greenhouse'>Green House</a></li>\
-<li><a href='/telegram'>Telegram</a></li>\
-<li><a href='/xml'>XML</a></li>\
 <li><a href='/update'>Update frimware</a></li>\
 <li><a href='/reboot'>Reboot ESP</a></li>\
 </ul></li></ul></div></div></nav>"; 
@@ -469,6 +519,7 @@ const char OFFP[] PROGMEM  = "OFF";
  
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////         ROOT 
 
+/*
 static char* floatToChar(float charester)
 {
   #ifdef DEBUG
@@ -485,10 +536,14 @@ static char* floatToChar(float charester)
 
  return value_buff;
 }
+*/
+
+bool MQTT_connect();
+
 
 
 void GetFreeMemory () {
-
+WiFiRSSIString = WiFi.RSSI();
   #ifdef DEBUG
     unsigned long start_time = millis();
     Serial.println(F("GetFreeMemory() Start"));
@@ -532,10 +587,9 @@ void GetMacString () {
 
   uint8_t macData[6];
   WiFi.macAddress(macData);
-  sprintf_P(value_buff, (const char *)F("%x:%x:%x:%x:%x:%x"), macData[0],  macData[1], macData[2], macData[3], macData[4], macData[5]);
-  if (macString != String(value_buff)){  
-    macString = String(value_buff);
-  }
+  sprintf_P(value_buff, (const char *)F("%x:%x:%x:%x:%x:%x"), macData[0], macData[1], macData[2], macData[3], macData[4], macData[5]);
+  
+  macString = String(value_buff);
 
   #ifdef DEBUG
     unsigned long load_time = millis() - start_time;
@@ -587,7 +641,7 @@ IPAddress stringToIp (String strIp) {
 
 
 
-bool isIPValid(const char * IP){
+bool isIPValid(const char * IP) {
 
   #ifdef DEBUG
     unsigned long start_time = millis();
@@ -601,38 +655,36 @@ bool isIPValid(const char * IP){
   char c;
 
   if (strlen(IP)>15 || strlen(IP)==0) {
-      return false;
+    return false;
   }
   //cannot start with .
   if (IP[0]=='.') {
-      return false;
+    return false;
   }
   //only letter and digit
   for (int i=0; i < strlen(IP); i++) {
-      c = IP[i];
-      if (isdigit(c)) {
-          //only 3 digit at once
-          internalcount++;
-          previouswasdot=false;
-          if (internalcount>3) {
-              return false;
-          }
-      } else if(c=='.') {
-          //cannot have 2 dots side by side
-          if (previouswasdot) {
-              return false;
-          }
-          previouswasdot=true;
-          internalcount=0;
-          dotcount++;
-      }//if not a dot neither a digit it is wrong
-      else {
-          return false;
+    c = IP[i];
+    if (isdigit(c)) {
+      //only 3 digit at once
+      internalcount++;
+      previouswasdot=false;
+      if (internalcount>3) {
+        return false;
       }
-  }
-  //if not 3 dots then it is wrong
-  if (dotcount!=3) {
+    } else if(c=='.') {
+      if (previouswasdot) {   //cannot have 2 dots side by side
+        return false;
+      }
+      previouswasdot=true;
+      internalcount=0;
+      dotcount++;
+    } else {    //if not a dot neither a digit it is wrong
       return false;
+    }
+  }
+  
+  if (dotcount!=3) {    //if not 3 dots then it is wrong
+    return false;
   }
   //cannot have the last dot as last char
   if (IP[strlen(IP)-1]=='.') {
@@ -649,7 +701,7 @@ bool isIPValid(const char * IP){
 
 
 
-void PWMChange(int pin, int bright){
+void PWMChange(int pin, int bright) {
   cycleEnd[pin] = bright;
 
   if ( ( atoi(JConf.light_smooth) == 0 && pin == atoi(JConf.light_pin) )   ||   ( atoi(JConf.light2_smooth) == 0 && pin == atoi(JConf.light2_pin) ) ){
@@ -701,20 +753,24 @@ void LightControl() {
   String ON;         ON += FPSTR(ONP);
   String OFF;        OFF += FPSTR(OFFP);
 
-  if (lightState == ON && luxString.toInt() < atoi(JConf.lighton_lux)){
-    PWMChange(atoi(JConf.light_pin), 1023);
+  if (lightState == ON){
+    PWMChange(atoi(JConf.light_pin), 1023);  
+    mySwitch.sendTriState(socket13TriStateOn);
   } else if (lightState == OFF){
     PWMChange(atoi(JConf.light_pin), 0);
+    mySwitch.sendTriState(socket13TriStateOff);
   } else if (lightState == AUTO && motionDetect == true && luxString.toInt() < atoi(JConf.lighton_lux)){
     PWMChange(atoi(JConf.light_pin), 1023);
+    mySwitch.sendTriState(socket13TriStateOn);
     lightOffTimer = millis();
   } else if (lightState == AUTO && motionDetect == false && cycleEnd[atoi(JConf.light_pin)] != 0){
     if (millis() - lightOffTimer >= atoi(JConf.lightoff_delay) * 60UL * 1000UL){
       PWMChange(atoi(JConf.light_pin), 0);
+      mySwitch.sendTriState(socket13TriStateOff);
     }
   }
 
-  if (lightState2 == ON && luxString.toInt() < atoi(JConf.light2on_lux)){
+  if (lightState2 == ON){
     PWMChange(atoi(JConf.light2_pin), 1023);
   } else if (lightState2 == OFF){
     PWMChange(atoi(JConf.light2_pin), 0);
@@ -743,24 +799,22 @@ void scanWiFi(void) {
   #endif
 
   int founds = WiFi.scanNetworks();
+
   #ifdef DEBUG
-  Serial.println();  Serial.println(F("scan done"));
-  #endif
-  if (founds == 0) {
-    #ifdef DEBUG
-    Serial.println(F("no networks found"));
-    #endif
-  } else {
-    #ifdef DEBUG
-    Serial.print(founds);  Serial.println(F(" networks found"));
-    for (size_t i = 0; i < founds; ++i) {
-      // Print SSID and RSSI for each network found
-      Serial.print(i + 1);  Serial.print(F(": "));  Serial.print(WiFi.SSID(i));  Serial.print(F(" ("));  Serial.print(WiFi.RSSI(i));  Serial.print(F(")"));
-      Serial.println((WiFi.encryptionType(i) == ENC_TYPE_NONE) ? F(" ") : F("*"));
-      delay(10);
+    Serial.println();  Serial.println(F("scan done"));
+    if (founds == 0) {
+      Serial.println(F("no networks found"));
+    } else {
+      Serial.print(founds);  Serial.println(F(" networks found"));
+      for (size_t i = 0; i < founds; ++i) {
+        // Print SSID and RSSI for each network found
+        Serial.print(i + 1);  Serial.print(F(": "));  Serial.print(WiFi.SSID(i));  Serial.print(F(" ("));  Serial.print(WiFi.RSSI(i));  Serial.print(F(")"));
+        Serial.println((WiFi.encryptionType(i) == ENC_TYPE_NONE) ? F(" ") : F("*"));
+        delay(10);
+      }
     }
-    #endif
-  }
+  #endif
+
   network_html = String(F("<blockquote>"));
   for (size_t i = 0; i < founds; ++i)
   {
@@ -782,174 +836,150 @@ void scanWiFi(void) {
 }
 
 
+
+void wifiAPSettings(){
+  if (atoi(JConf.wifi_auth) == OPEN){
+    WiFi.softAP(JConf.module_id);
+  } else {
+    WiFi.softAP(JConf.module_id, JConf.ap_pwd);
+  }
+
+  //setup PHY_MODE
+  if (atoi(JConf.wifi_phy_mode) == B){
+    wifi_set_phy_mode((phy_mode_t)PHY_MODE_11B);    //PHY_MODE_11B,PHY_MODE_11G,PHY_MODE_11N
+  } else if (atoi(JConf.wifi_phy_mode) == G){
+    wifi_set_phy_mode((phy_mode_t)PHY_MODE_11G);
+  } else {
+    wifi_set_phy_mode((phy_mode_t)PHY_MODE_11N);
+  }
+
+  //get current config
+  struct softap_config apconfig;
+  wifi_softap_get_config(&apconfig);
+  //set the chanel
+  apconfig.channel=atoi(JConf.wifi_channel);
+
+  //set Authentification type                      //AUTH_OPEN,AUTH_WPA_PSK,AUTH_WPA2_PSK,AUTH_WPA_WPA2_PSK
+  if (atoi(JConf.wifi_auth) == OPEN){
+    apconfig.authmode=(AUTH_MODE)AUTH_OPEN;
+  } else if (atoi(JConf.wifi_auth) == WPA_PSK){
+    apconfig.authmode=(AUTH_MODE)AUTH_WPA_PSK;
+  } else if (atoi(JConf.wifi_auth) == WPA2_PSK){
+    apconfig.authmode=(AUTH_MODE)AUTH_WPA2_PSK;
+  } else {
+    apconfig.authmode=(AUTH_MODE)AUTH_WPA_WPA2_PSK;
+  }
+
+  //set the visibility of SSID
+  apconfig.ssid_hidden=0;
+  //no need to add these settings to configuration just use default ones
+  //apconfig.max_connection=2;
+  //apconfig.beacon_interval=100;
+  //apply settings to current and to default
+  if (!wifi_softap_set_config(&apconfig) || !wifi_softap_set_config_current(&apconfig)) {
+      Serial.println(F("Error Wifi AP_STA!"));
+      delay(1000);
+  }
+}
+
+
+
+bool wifiTryConnect(){
+  byte i=0;
+  while (WiFi.status() != WL_CONNECTED && i<40) {  //try to connect
+    switch(WiFi.status()) {
+    case 1:
+      Serial.println(F("No SSID found!"));
+      break;
+    case 4:
+      Serial.println(F("No Connection!"));
+      break;
+    default:
+      Serial.println(F("Connecting..."));
+      break;
+    }
+    delay(500);
+    i++;
+  }
+  if (WiFi.status() != WL_CONNECTED) {
+    return false;
+  }
+  return true;
+}
+
+
+
+void wifiAP() {
+  WiFi.mode(WIFI_AP);   //setup Soft AP
+  wifiAPSettings();
+}
+
+
+
+bool wifiSTA() {
+  WiFi.mode(WIFI_STA);                            //setup station mode
+  WiFi.begin(JConf.sta_ssid, JConf.sta_pwd);
+  delay(500);
+  
+  wifi_set_phy_mode((phy_mode_t)PHY_MODE_11N);    //setup PHY_MODE
+
+  if (!wifiTryConnect()) {
+    return false;
+  }
+  WiFi.hostname(JConf.module_id);
+  return true; 
+}
+
+
+
+bool wifiAP_STA() {
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.begin(JConf.sta_ssid, JConf.sta_pwd);
+
+  if (!wifiTryConnect()) {
+    return false;
+  }
+  wifiAPSettings();
+  return true;
+}
+
+
+
+void wifiReconnect() {
+  if (WiFi.status() != WL_CONNECTED && atoi(JConf.wifi_mode) != AP && wifiSafeMode == false) {
+    #ifdef DEBUG
+      Serial.print(F("Connecting "));
+      Serial.println(F("..."));
+    #endif
+
+    WiFiSetup();
+  }
+}
+
+
+
 bool WiFiSetup()
 {
   wifi_set_sleep_type ((sleep_type_t)NONE_SLEEP_T);   // NONE_SLEEP_T,LIGHT_SLEEP_T,MODEM_SLEEP_T
-  //disconnect if connected
   WiFi.disconnect();
-  //this is AP mode
+
   if (atoi(JConf.wifi_mode) == AP) {
-    //setup Soft AP
-    WiFi.mode(WIFI_AP);
-
-    if (atoi(JConf.wifi_auth) == OPEN){
-      WiFi.softAP(JConf.module_id);
-    } else {
-      WiFi.softAP(JConf.module_id, JConf.ap_pwd);
-    }
-
-    //setup PHY_MODE
-    if (atoi(JConf.wifi_phy_mode) == B){
-      wifi_set_phy_mode((phy_mode_t)PHY_MODE_11B);    //PHY_MODE_11B,PHY_MODE_11G,PHY_MODE_11N
-    } else if (atoi(JConf.wifi_phy_mode) == G){
-      wifi_set_phy_mode((phy_mode_t)PHY_MODE_11G);
-    } else {
-      wifi_set_phy_mode((phy_mode_t)PHY_MODE_11N);
-    }
-
-    //get current config
-    struct softap_config apconfig;
-    wifi_softap_get_config(&apconfig);
-    //set the chanel
-    apconfig.channel=atoi(JConf.wifi_channel);
-
-    //set Authentification type                      //AUTH_OPEN,AUTH_WPA_PSK,AUTH_WPA2_PSK,AUTH_WPA_WPA2_PSK
-    if (atoi(JConf.wifi_auth) == OPEN){
-      apconfig.authmode=(AUTH_MODE)AUTH_OPEN;
-    } else if (atoi(JConf.wifi_auth) == WPA_PSK){
-      apconfig.authmode=(AUTH_MODE)AUTH_WPA_PSK;
-    } else if (atoi(JConf.wifi_auth) == WPA2_PSK){
-      apconfig.authmode=(AUTH_MODE)AUTH_WPA2_PSK;
-    } else {
-      apconfig.authmode=(AUTH_MODE)AUTH_WPA_WPA2_PSK;
-    }
-
-    //set the visibility of SSID
-    apconfig.ssid_hidden=0;
-    //no need to add these settings to configuration just use default ones
-    //apconfig.max_connection=2;
-    //apconfig.beacon_interval=100;
-    //apply settings to current and to default
-    if (!wifi_softap_set_config(&apconfig) || !wifi_softap_set_config_current(&apconfig)) {
-        Serial.println(F("Error Wifi AP!"));
-        delay(1000);
-    }
-    
-  } else if (atoi(JConf.wifi_mode) == STA) {
-    //setup station mode
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(JConf.sta_ssid, JConf.sta_pwd);
-    delay(500);
-    //setup PHY_MODE
-    wifi_set_phy_mode((phy_mode_t)PHY_MODE_11N);
-    delay(500);
-    byte i=0;
-    //try to connect
-    while (WiFi.status() != WL_CONNECTED && i<40) {
-        switch(WiFi.status()) {
-        case 1:
-            Serial.println(F("No SSID found!"));
-            break;
-
-        case 4:
-            Serial.println(F("No Connection!"));
-            break;
-
-        default:
-            Serial.println(F("Connecting..."));
-            break;
-        }
-        delay(500);
-        i++;
-    }
-    if (WiFi.status() != WL_CONNECTED) {
-        return false;
-    }
-    WiFi.hostname(JConf.module_id);
-  } else if (atoi(JConf.wifi_mode) == AP_STA) {
-    WiFi.mode(WIFI_AP_STA);
-    WiFi.begin(JConf.sta_ssid, JConf.sta_pwd);
-
-    delay(500);
-    byte i=0;
-    //try to connect
-    while (WiFi.status() != WL_CONNECTED && i<40) {
-        switch(WiFi.status()) {
-        case 1:
-            Serial.println(F("No SSID found!"));
-            break;
-
-        case 4:
-            Serial.println(F("No Connection!"));
-            break;
-
-        default:
-            Serial.println(F("Connecting..."));
-            break;
-        }
-        delay(500);
-        i++;
-    }
-    if (WiFi.status() != WL_CONNECTED) {
-        return false;
-    }
-
-
-    if (atoi(JConf.wifi_auth) == OPEN){
-      WiFi.softAP(JConf.module_id);
-    } else {
-      WiFi.softAP(JConf.module_id, JConf.ap_pwd);
-    }
-
-    //setup PHY_MODE
-    if (atoi(JConf.wifi_phy_mode) == B){
-      wifi_set_phy_mode((phy_mode_t)PHY_MODE_11B);    //PHY_MODE_11B,PHY_MODE_11G,PHY_MODE_11N
-    } else if (atoi(JConf.wifi_phy_mode) == G){
-      wifi_set_phy_mode((phy_mode_t)PHY_MODE_11G);
-    } else {
-      wifi_set_phy_mode((phy_mode_t)PHY_MODE_11N);
-    }
-
-    //get current config
-    struct softap_config apconfig;
-    wifi_softap_get_config(&apconfig);
-    //set the chanel
-    apconfig.channel=atoi(JConf.wifi_channel);
-
-    //set Authentification type                      //AUTH_OPEN,AUTH_WPA_PSK,AUTH_WPA2_PSK,AUTH_WPA_WPA2_PSK
-    if (atoi(JConf.wifi_auth) == OPEN){
-      apconfig.authmode=(AUTH_MODE)AUTH_OPEN;
-    } else if (atoi(JConf.wifi_auth) == WPA_PSK){
-      apconfig.authmode=(AUTH_MODE)AUTH_WPA_PSK;
-    } else if (atoi(JConf.wifi_auth) == WPA2_PSK){
-      apconfig.authmode=(AUTH_MODE)AUTH_WPA2_PSK;
-    } else {
-      apconfig.authmode=(AUTH_MODE)AUTH_WPA_WPA2_PSK;
-    }
-
-    //set the visibility of SSID
-    apconfig.ssid_hidden=0;
-    //no need to add these settings to configuration just use default ones
-    //apconfig.max_connection=2;
-    //apconfig.beacon_interval=100;
-    //apply settings to current and to default
-    if (!wifi_softap_set_config(&apconfig) || !wifi_softap_set_config_current(&apconfig)) {
-        Serial.println(F("Error Wifi AP_STA!"));
-        delay(1000);
-    }
+    wifiAP();
+  } else if (atoi(JConf.wifi_mode) == STA && !wifiSTA()) {
+    return false;
+  } else if (atoi(JConf.wifi_mode) == AP_STA && !wifiAP_STA()) {
+    return false;
   }
 
   //DHCP or Static IP ?
   if (atoi(JConf.static_ip_enable) == 1) {
-
-      IPAddress staticIP = stringToIp(JConf.static_ip);
-      IPAddress staticGateway = stringToIp(JConf.static_gateway);
-      IPAddress staticSubnet = stringToIp(JConf.static_subnet);
-
-      //apply according active wifi mode
-      if (wifi_get_opmode()==WIFI_STA || wifi_get_opmode()==WIFI_AP_STA) {
-        WiFi.config(staticIP, staticGateway, staticSubnet);
-      }
+    IPAddress staticIP = stringToIp(JConf.static_ip);
+    IPAddress staticGateway = stringToIp(JConf.static_gateway);
+    IPAddress staticSubnet = stringToIp(JConf.static_subnet);
+    //apply according active wifi mode
+    if (wifi_get_opmode()==WIFI_STA || wifi_get_opmode()==WIFI_AP_STA) {
+      WiFi.config(staticIP, staticGateway, staticSubnet);
+    }
   }
   //Get IP
   IPAddress espIP;
@@ -964,6 +994,7 @@ bool WiFiSetup()
 }
 
 
+
 void  WiFiSafeSetup()
 {
   WiFi.disconnect();
@@ -976,6 +1007,16 @@ void  WiFiSafeSetup()
 }
 
 
+
+void wifiSafeModeReconnect() {
+  if (wifiSafeMode == true && WiFiSetup()) {
+    wifiSafeMode = false; 
+  }
+}
+
+
+
+#ifdef BH1750_ON
 void GetLightSensorData()
 {
   #ifdef DEBUG
@@ -994,6 +1035,7 @@ void GetLightSensorData()
     Serial.print(F("GetLightSensorData() Load Time: ")); Serial.println(load_time);
   #endif
 }
+#endif
 
 
 
@@ -1037,10 +1079,10 @@ void GetSHT21SensorData(){
     Serial.println(F("GetSHT21SensorData() Start"));
   #endif
 
-  myHTU21D.setResolution(HTU21D_RES_RH11_TEMP11);
+  myHTU21D.setResolution(HTU21D_RES_RH8_TEMP12);
   temperatureString = String(myHTU21D.readTemperature());
-  humidityString = String(myHTU21D.readCompensatedHumidity());
-
+//  humidityString = String(myHTU21D.readCompensatedHumidity());
+  humidityString = String(myHTU21D.readHumidity());
   #ifdef DEBUG
     Serial.println(F(""));  Serial.println(F(""));  Serial.println(F("<<%RH: 8Bit, Temperature - 12Bit>>"));
     
@@ -1076,17 +1118,17 @@ void DHT22Sensor()
     Serial.println(F("DHT22Sensor() Start"));
   #endif
 
-  float temperatureData = dht.readTemperature();
   float humidityData = dht.readHumidity();
+  float temperatureData = dht.readTemperature();
+
   #ifdef DEBUG
     Serial.print(F("Humidity "));  Serial.println(humidityData);
     Serial.print(F("Temperature "));  Serial.println(temperatureData);
   #endif
+
   if (isnan(humidityData) || isnan(temperatureData)) {
-    errorDHTdata++;
-    #ifdef DEBUG
-      Serial.print(F("Failed to read from DHT. Number errors: "));  Serial.println(errorDHTdata);
-    #endif
+    Serial.println("Failed to read from DHT sensor!");
+    return;
   } else {
     temperatureString = String(temperatureData);
     humidityString = String(humidityData);
@@ -1100,38 +1142,124 @@ void DHT22Sensor()
 #endif
 
 
+#if defined(PZEM_ON)
+bool GetPzemData(float data, String *val) {
+  if (data < 0.0){
+    return false;
+  } else if (pzem_current_read == PZEM_POWER || pzem_current_read == PZEM_ENERGY) {
+    data = data * coil_ratio / 1000;
+  } else if (pzem_current_read == PZEM_CURRENT) {
+    data = data * coil_ratio;
+  } 
+  *val = String(data);
+  return true;
+}
 
-void MotionDetect(){
 
-  #ifdef DEBUG11
+
+void GetPzemSerialRead() { 
+  #ifdef DEBUG
     unsigned long start_time = millis();
-    Serial.println(F("MotionDetect() Start"));
+    Serial.println(F("GetPzemSerialRead() Start"));
   #endif
 
-  if (digitalRead(atoi(JConf.motion_pin)) == HIGH) {
-    #ifdef DEBUG
-      Serial.println(F("MotionSensor moove detected"));
-    #endif
-    motionDetect = true;
-    LightControl();
-    if (atoi(JConf.mqtt_enable) == 1) {
-      if (mqttClient.connected()) {
-        sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.publish_topic,  motionSensor, JConf.mqtt_name);
-        mqttClient.publish(topic_buff, "ON");
+  switch (pzem_current_read) {
+    case PZEM_VOLTAGE:
+      if (GetPzemData(pzem.voltage(ip_pzem), &pzemVoltageString)) {
+        pzem_current_read = PZEM_CURRENT;
       }
-    }
+      break;
+    case PZEM_CURRENT:
+      if (GetPzemData(pzem.current(ip_pzem), &pzemCurrentString)) {
+        pzem_current_read = PZEM_POWER;
+      }
+      break;
+    case PZEM_POWER:
+      if (GetPzemData(pzem.power(ip_pzem), &pzemPowerString)) {
+        pzem_current_read = PZEM_ENERGY;
+      }
+      break;
+    case PZEM_ENERGY:
+      GetPzemData(pzem.energy(ip_pzem), &pzemEnergyString);
+      pzem_current_read = PZEM_VOLTAGE;
+      break;
+    default:
+      pzem_current_read = PZEM_VOLTAGE;
   }
 
-  #ifdef DEBUG11
+  #ifdef DEBUG
     unsigned long load_time = millis() - start_time;
-    Serial.print(F("MotionDetect() Load Time: ")); Serial.println(load_time);
+    Serial.print(F("GetPzemSerialRead() Load Time: ")); Serial.println(load_time);
   #endif
 }
 
 
 
+void PzemResetEnergy() {
+
+  String ON;         ON += FPSTR(ONP);
+  String OFF;        OFF += FPSTR(OFFP);
+
+  switch (pzem_reset_stage) {
+    case PZEM_STAGE1:
+      lightState = ON;
+      LightControl();
+      pzem_reset_stage = PZEM_STAGE2;
+      timer.setTimeout(6000, PzemResetEnergy);
+      break;
+    case PZEM_STAGE2:
+      lightState = OFF;
+      LightControl();
+      pzem_reset_stage = PZEM_STAGE3;
+      timer.setTimeout(1000, PzemResetEnergy);
+      break;
+    case PZEM_STAGE3:
+      lightState = ON;
+      LightControl();
+      pzem_reset_stage = PZEM_STAGE4;
+      timer.setTimeout(1000, PzemResetEnergy);
+      break;
+    case PZEM_STAGE4:
+      lightState = OFF;
+      LightControl();
+      pzem_reset_stage = PZEM_STAGE1;
+      break;
+    default:
+      break;
+  }
+}
+#endif
+
+
+void MotionDetect(){
+
+//  #ifdef DEBUG
+//    unsigned long start_time = millis();
+//    Serial.println(F("MotionDetect() Start"));
+//  #endif
+
+  if (digitalRead(atoi(JConf.motion_pin)) == HIGH) {
+    #ifdef DEBUG
+      Serial.println(F("MotionSensor: movement detected"));
+    #endif
+    motionDetect = true;
+    LightControl();
+    if (atoi(JConf.mqtt_enable) == 1 && mqtt.connected()) {
+      pubTopicMotionSensor.publish("ON");
+    }
+  } else {
+    motionDetect = false;
+  }
+
+ // #ifdef DEBUG
+ //   unsigned long load_time = millis() - start_time;
+ //   Serial.print(F("MotionDetect() Load Time: ")); Serial.println(load_time);
+ // #endif
+}
+
+
+
 String GetUptimeData(){
-WiFiRSSIString = WiFi.RSSI();
   #ifdef DEBUG
     unsigned long start_time = millis();
     Serial.println(F("GetUptimeData() Start"));
@@ -1167,102 +1295,119 @@ WiFiRSSIString = WiFi.RSSI();
 
 
 
-void RebootESP()
-{
-  #ifdef DEBUG
-    unsigned long start_time = millis();
-    Serial.println(F("RebootESP() Start"));
-  #endif
+#ifdef NTP_ON
+void NTPSettingsUpdate(){
+  if (atoi(JConf.ntp_enable) == 1) {
+    timeClient.setUpdateServer(JConf.ntp_server);
+    timeClient.setTimeOffset(atoi(JConf.my_time_zone) * 60 * 60);
+  }
+}
+#endif
 
-  if (millis() - rebootTimer >= atoi(JConf.reboot_delay) * 1000){
-  ESP.restart();
+
+
+bool MQTT_connect() {
+  int8_t ret;
+  // Stop if already connected.
+  if (mqtt.connected()) {
+    return true;
   }
 
   #ifdef DEBUG
-    unsigned long load_time = millis() - start_time;
-    Serial.print(F("RebootESP() Load Time: ")); Serial.println(load_time);
+    Serial.print("Connecting to MQTT... ");
   #endif
+
+  if ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
+    #ifdef DEBUG
+      Serial.println(mqtt.connectErrorString(ret));
+    #endif
+    mqtt.disconnect();
+    return false;
+  }
+
+  #ifdef DEBUG
+    Serial.println("MQTT Connected!");
+  #endif
+
+  return true;
 }
 
 
 
-// handles message arrived on subscribed topic(s)
-void callback(char* topic, byte* payload, unsigned int length) {
+void MqttInit() {
+  //Publish Topics
+  sprintf(lightType_buff, "%s%s%s", JConf.publish_topic, lightType, JConf.mqtt_name);
+  pubTopicLightType = Adafruit_MQTT_Publish(&mqtt, lightType_buff);
 
-  #ifdef DEBUG
-    unsigned long start_time = millis();
-    Serial.println(F("callback() Start"));
-  #endif
+  sprintf(lightType2_buff, "%s%s%s", JConf.publish_topic, lightType2, JConf.mqtt_name);
+  pubTopicLightType2 = Adafruit_MQTT_Publish(&mqtt, lightType2_buff);
 
-  subscribeTimer = millis();
-  rebootTimer = millis();
+  sprintf(motionSensor_buff, "%s%s%s", JConf.publish_topic, motionSensor, JConf.mqtt_name);
+  pubTopicMotionSensor = Adafruit_MQTT_Publish(&mqtt, motionSensor_buff);
 
-  size_t i=0;
-  // create character buffer with ending null terminator (string)
-  for(i=0; i<length; i++) {
-    value_buff[i] = payload[i];
-  }
-  value_buff[i] = '\0';
+  sprintf(motionSensorTimer_buff, "%s%s%s", JConf.publish_topic, motionSensorTimer, JConf.mqtt_name);
+  pubTopicMotionSensorTimer = Adafruit_MQTT_Publish(&mqtt, motionSensorTimer_buff);
 
-  #ifdef DEBUG
-  Serial.print(F("callback: "));  Serial.print(topic);  Serial.print(F(" payload "));  Serial.println(value_buff);
-  #endif
+  sprintf(motionSensorTimer2_buff, "%s%s%s", JConf.publish_topic, motionSensorTimer2, JConf.mqtt_name);
+  pubTopicMotionSensorTimer2 = Adafruit_MQTT_Publish(&mqtt, motionSensorTimer2_buff);
 
-  // Обрабатываем данные о состоянии светодиодной ленты (AUTO, ON, OFF)
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.command_pub_topic, lightType, JConf.mqtt_name);
-  if (strcmp (topic,topic_buff) == 0){
+  sprintf(lux_buff, "%s%s%s", JConf.publish_topic, lux, JConf.mqtt_name);
+  pubTopicLux = Adafruit_MQTT_Publish(&mqtt, lux_buff);
 
-    String AUTO;       AUTO += FPSTR(AUTOP);
-    String ON;         ON += FPSTR(ONP);
-    String OFF;        OFF += FPSTR(OFFP);
+  sprintf(temperature_buff, "%s%s%s", JConf.publish_topic, temperature, JConf.mqtt_name);
+  pubTopicTemperature = Adafruit_MQTT_Publish(&mqtt, temperature_buff);
 
-    #ifdef DEBUG
-      Serial.print(F("topic: "));  Serial.print(topic);  Serial.print(F(" equals "));  Serial.println(topic_buff);
-    #endif
-    if (strncmp (value_buff,"1",1) == 0){
-      lightState = ON;
-    } else if (strncmp (value_buff,"0",1) == 0){
-      lightState = OFF;
-    } else if (strncmp (value_buff,"2",1) == 0){
-      lightState = AUTO;
-    }
+  sprintf(humidity_buff, "%s%s%s", JConf.publish_topic, humidity, JConf.mqtt_name);
+  pubTopicHumidity = Adafruit_MQTT_Publish(&mqtt, humidity_buff);
 
-    #ifdef DEBUG
-      Serial.print(F("value_buff: "));  Serial.print(value_buff);  Serial.print(F(" contains "));   Serial.print(lightState);
-    #endif
+  sprintf(pressure_buff, "%s%s%s", JConf.publish_topic, pressure, JConf.mqtt_name);
+  pubTopicPressure = Adafruit_MQTT_Publish(&mqtt, pressure_buff);
 
-    LightControl();
-  }
+  sprintf(pzemVoltage_buff, "%s%s%s", JConf.publish_topic, pzemVoltage, JConf.mqtt_name);
+  pubTopicPzemVoltage = Adafruit_MQTT_Publish(&mqtt, pzemVoltage_buff);
 
+  sprintf(pzemCurrent_buff, "%s%s%s", JConf.publish_topic, pzemCurrent, JConf.mqtt_name);
+  pubTopicPzemCurrent = Adafruit_MQTT_Publish(&mqtt, pzemCurrent_buff);
 
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.command_pub_topic, motionsensortimer, JConf.mqtt_name);
-    if (strcmp (topic,topic_buff) == 0){
-      #ifdef DEBUG
-        Serial.print(F("topic: "));  Serial.print(topic);  Serial.print(F(" equals "));  Serial.println(topic_buff);
-      #endif
-      sprintf_P(JConf.lightoff_delay, (const char *)F("%s"), value_buff);
-      JConf.saveConfig();
-    }
+  sprintf(pzemPower_buff, "%s%s%s", JConf.publish_topic, pzemPower, JConf.mqtt_name);
+  pubTopicPzemPower = Adafruit_MQTT_Publish(&mqtt, pzemPower_buff);
 
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.command_pub_topic, motionsensortimer2, JConf.mqtt_name);
-    if (strcmp (topic,topic_buff) == 0){
-      #ifdef DEBUG
-        Serial.print(F("topic: "));  Serial.print(topic);  Serial.print(F(" equals "));  Serial.println(topic_buff);
-      #endif
-      sprintf_P(JConf.light2off_delay, (const char *)F("%s"), value_buff);
-      JConf.saveConfig();
-    }
+  sprintf(pzemEnergy_buff, "%s%s%s", JConf.publish_topic, pzemEnergy, JConf.mqtt_name);
+  pubTopicPzemEnergy = Adafruit_MQTT_Publish(&mqtt, pzemEnergy_buff);
 
+  sprintf(freeMemory_buff, "%s%s%s", JConf.publish_topic, freeMemory, JConf.mqtt_name);
+  pubTopicFreeMemory = Adafruit_MQTT_Publish(&mqtt, freeMemory_buff);
 
-  #ifdef DEBUG
-    Serial.print(F("topic: "));  Serial.println(topic);  Serial.print(F("value_buff: "));  Serial.println(value_buff);
-    Serial.println();
-  #endif
+  sprintf(uptime_buff, "%s%s%s", JConf.publish_topic, uptime, JConf.mqtt_name);
+  pubTopicUptime = Adafruit_MQTT_Publish(&mqtt, uptime_buff);
 
-  #ifdef DEBUG
-    unsigned long load_time = millis() - start_time;
-    Serial.print(F("callback() Load Time: ")); Serial.println(load_time);
-  #endif
+  sprintf(version_buff, "%s%s%s", JConf.publish_topic, version, JConf.mqtt_name);
+  pubTopicVersion = Adafruit_MQTT_Publish(&mqtt, version_buff);
+
+  sprintf(ip_buff, "%s%s%s", JConf.publish_topic, ip, JConf.mqtt_name);
+  pubTopicIp = Adafruit_MQTT_Publish(&mqtt, ip_buff);
+
+  sprintf(mac_buff, "%s%s%s", JConf.publish_topic, mac, JConf.mqtt_name);
+  pubTopicMac = Adafruit_MQTT_Publish(&mqtt, mac_buff);
+
+  //Subscribe Topics
+  sprintf(motionSensorTimer_buff_sub, "%s%s%s", JConf.command_pub_topic, motionSensorTimer, JConf.mqtt_name);
+  subTopicMotionSensorTimer = Adafruit_MQTT_Subscribe(&mqtt, motionSensorTimer_buff_sub);
+
+  sprintf(motionSensorTimer2_buff_sub, "%s%s%s", JConf.command_pub_topic, motionSensorTimer2, JConf.mqtt_name);
+  subTopicMotionSensorTimer2 = Adafruit_MQTT_Subscribe(&mqtt, motionSensorTimer2_buff_sub);
+
+  sprintf(lightType_buff_sub, "%s%s%s", JConf.command_pub_topic, lightType, JConf.mqtt_name);
+  subTopicLightType = Adafruit_MQTT_Subscribe(&mqtt, lightType_buff_sub);
+
+  sprintf(lightType2_buff_sub, "%s%s%s", JConf.command_pub_topic, lightType2, JConf.mqtt_name);
+  subTopicLightType2 = Adafruit_MQTT_Subscribe(&mqtt, lightType2_buff_sub);
+
+  sprintf(uptime_buff_sub, "%s%s%s", JConf.command_pub_topic, uptime, JConf.mqtt_name);
+  subTopicUptime = Adafruit_MQTT_Subscribe(&mqtt, uptime_buff_sub);
+
+  sprintf(pzemReset_buff_sub, "%s%s%s", JConf.command_pub_topic, pzemReset, JConf.mqtt_name);
+  subTopicPzemReset = Adafruit_MQTT_Subscribe(&mqtt, pzemReset_buff_sub);
 }
 
 
@@ -1274,7 +1419,7 @@ bool MqttPubLightState(){
     Serial.println(F("MqttPubLightState() Start"));
   #endif
 
-  if (!mqttClient.connected()){
+  if (!mqtt.connected()){
     #ifdef DEBUG
       Serial.print(F("MQTT server not connected"));  Serial.println();
       unsigned long load_time = millis() - start_time;
@@ -1286,7 +1431,6 @@ bool MqttPubLightState(){
   String ON;         ON += FPSTR(ONP);
   String OFF;        OFF += FPSTR(OFFP);
 
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.publish_topic,  lightType, JConf.mqtt_name);
   String lightStateNum;
   if (lightState == ON){
     lightStateNum = String(F("1"));
@@ -1295,9 +1439,8 @@ bool MqttPubLightState(){
   } else {
     lightStateNum = String(F("2"));
   }
-  mqttClient.publish(topic_buff, lightStateNum.c_str());
+  pubTopicLightType.publish(lightStateNum.c_str());
 
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.publish_topic,  lightType2, JConf.mqtt_name);
   if (lightState2 == ON){
     lightStateNum = String(F("1"));
   } else if (lightState2 == OFF){
@@ -1305,7 +1448,7 @@ bool MqttPubLightState(){
   } else {
     lightStateNum = String(F("2"));
   }
-  mqttClient.publish(topic_buff, lightStateNum.c_str());
+  pubTopicLightType2.publish(lightStateNum.c_str());
 
   #ifdef DEBUG
     unsigned long load_time = millis() - start_time;
@@ -1325,7 +1468,7 @@ bool MqttPubLightOffDelay() {
   #endif
 
 
-  if (!mqttClient.connected()){
+  if (!mqtt.connected()){
     #ifdef DEBUG
       Serial.print(F("MQTT server not connected"));  Serial.println();
       unsigned long load_time = millis() - start_time;
@@ -1335,11 +1478,9 @@ bool MqttPubLightOffDelay() {
     return false;
   }
 
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.publish_topic,  motionsensortimer, JConf.mqtt_name);
-  mqttClient.publish(topic_buff, JConf.lightoff_delay);
+  pubTopicMotionSensorTimer.publish(JConf.lightoff_delay);
 
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.publish_topic,  motionsensortimer2, JConf.mqtt_name);
-  mqttClient.publish(topic_buff, JConf.light2off_delay);
+  pubTopicMotionSensorTimer2.publish(JConf.light2off_delay);
 
   #ifdef DEBUG
     unsigned long load_time = millis() - start_time;
@@ -1358,7 +1499,7 @@ bool MqttPubData() {
     Serial.println(F("MqttPubData() Start"));
   #endif
 
-  if (mqttClient.state() != 0){
+  if (!mqtt.connected()){
     #ifdef DEBUG
       Serial.print(F("MQTT server not connected"));  Serial.println();
       unsigned long load_time = millis() - start_time;
@@ -1367,41 +1508,34 @@ bool MqttPubData() {
     return false;
   }
 
-  Serial.print(F("MQTT data send"));  Serial.println();
+  if (atoi(JConf.bh1750_enable) == 1){
+    pubTopicLux.publish(luxString.c_str());
+  }
 
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.publish_topic,  lux, JConf.mqtt_name);
-  mqttClient.publish(topic_buff, luxString.c_str());
+  if (atoi(JConf.bme280_enable) == 1  ||  atoi(JConf.sht21_enable) == 1 ||  atoi(JConf.dht_enable) == 1){
+    pubTopicTemperature.publish(temperatureString.c_str());
+    pubTopicHumidity.publish(humidityString.c_str());
+  }
 
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.publish_topic, temperature, JConf.mqtt_name);
-  mqttClient.publish(topic_buff, temperatureString.c_str());
+  if (atoi(JConf.bme280_enable) == 1){
+    pubTopicPressure.publish(pressureString.c_str());
+  }
 
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.publish_topic, pressure, JConf.mqtt_name);
-  mqttClient.publish(topic_buff, pressureString.c_str());
+  pubTopicFreeMemory.publish(freeMemoryString.c_str());
+  pubTopicUptime.publish(uptimeString.c_str());
+  pubTopicVersion.publish(ver);
+  pubTopicIp.publish(ipString.c_str());
+  pubTopicMac.publish(macString.c_str());
 
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.publish_topic,  humidity, JConf.mqtt_name);
-  mqttClient.publish(topic_buff, humidityString.c_str());
-
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.publish_topic,  freeMemory, JConf.mqtt_name);
-  mqttClient.publish(topic_buff, freeMemoryString.c_str());
-
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.publish_topic, uptime, JConf.mqtt_name);
-  mqttClient.publish(topic_buff, uptimeString.c_str());
-
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.publish_topic,  version, JConf.mqtt_name);
-  mqttClient.publish(topic_buff, ver);
-
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.publish_topic,  ip, JConf.mqtt_name);
-  mqttClient.publish(topic_buff, ipString.c_str());
-
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.publish_topic,  mac, JConf.mqtt_name);
-  mqttClient.publish(topic_buff, macString.c_str());
-
- 
-  #ifdef DHT_ON
-    sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.publish_topic,  errorsDHT, JConf.mqtt_name);
-    sprintf_P(value_buff, (const char *)F("%d"), errorDHTdata);  
-    mqttClient.publish(topic_buff, value_buff);
+  #ifdef PZEM_ON
+    if (atoi(JConf.pzem_enable) == 1){
+      pubTopicPzemVoltage.publish(pzemVoltageString.c_str());
+      pubTopicPzemCurrent.publish(pzemCurrentString.c_str());
+      pubTopicPzemPower.publish(pzemPowerString.c_str());
+      pubTopicPzemEnergy.publish(pzemEnergyString.c_str());
+    }
   #endif
+
 
   #ifdef DEBUG
     unsigned long load_time = millis() - start_time;
@@ -1413,127 +1547,135 @@ bool MqttPubData() {
 
 
 
-bool MqttSubscribePrint(char *sub_buff)
-{
+void CallbackMotionSensorTimer(char *data, uint16_t len) {
   #ifdef DEBUG
-    unsigned long start_time = millis();
-    Serial.println(F("MqttSubscribePrint() Start"));
+    Serial.print(F("CallbackMotionSensorTimer: "));
+    Serial.println(data);
   #endif
 
-  delay(50);
-  if (!mqttClient.connected()){
-    #ifdef DEBUG
-      Serial.print(F("MQTT server not connected"));  Serial.println();
-    #endif
-    return false;
-  }
-
-  if (mqttClient.subscribe(sub_buff)) {
-    #ifdef DEBUG
-      Serial.print(F("subscribe: "));  Serial.println(sub_buff);
-    #endif
-  } else {
-    #ifdef DEBUG
-      mqttClient.disconnect();
-      Serial.print(F("ERROR subscribe: "));  Serial.println(sub_buff);
-    #endif
-  }
-
-  #ifdef DEBUG
-    unsigned long load_time = millis() - start_time;
-    Serial.print(F("MqttSubscribePrint() Load Time: ")); Serial.println(load_time);
-  #endif
-
-  return true;
+  sprintf_P(JConf.lightoff_delay, (const char *)F("%s"), data);
+  JConf.saveConfig();
 }
 
 
 
-bool MqttSubscribe(){
+void CallbackMotionSensorTimer2(char *data, uint16_t len) {
+  #ifdef DEBUG
+    Serial.print(F("CallbackMotionSensorTimer2: "));
+    Serial.println(data);
+  #endif
+
+  sprintf_P(JConf.light2off_delay, (const char *)F("%s"), data);
+  JConf.saveConfig();
+}
+
+
+
+void CallbackLightType(char *data, uint16_t len) {
+  #ifdef DEBUG
+    Serial.print(F("CallbackLightType: "));
+    Serial.println(data);
+  #endif
+
+  String AUTO;       AUTO += FPSTR(AUTOP);
+  String ON;         ON += FPSTR(ONP);
+  String OFF;        OFF += FPSTR(OFFP);
+
+  if (strncmp (data,"1",1) == 0){
+    lightState = ON;
+  } else if (strncmp (data,"0",1) == 0){
+    lightState = OFF;
+  } else if (strncmp (data,"2",1) == 0){
+    lightState = AUTO;
+  }
+
+  LightControl();
+}
+
+
+
+void CallbackLightType2(char *data, uint16_t len) {
+  #ifdef DEBUG
+    Serial.print(F("CallbackLightType2: "));
+    Serial.println(data);
+  #endif
+
+  String AUTO;       AUTO += FPSTR(AUTOP);
+  String ON;         ON += FPSTR(ONP);
+  String OFF;        OFF += FPSTR(OFFP);
+
+  if (strncmp (data,"1",1) == 0){
+    lightState2 = ON;
+  } else if (strncmp (data,"0",1) == 0){
+    lightState2 = OFF;
+  } else if (strncmp (data,"2",1) == 0){
+    lightState2 = AUTO;
+  }
+
+  LightControl();
+}
+
+
+
+#ifdef PZEM_ON
+void CallbackPzemReset(char *data, uint16_t len) {
+  #ifdef DEBUG
+    Serial.print(F("CallbackPzemReset: "));
+    Serial.println(data);
+  #endif
+
+  if (strncmp (data,"ON",1) == 0){
+    PzemResetEnergy();
+  }
+}
+#endif
+
+
+
+void CallbackUptime(char *data, uint16_t len) {
+  #ifdef DEBUG
+    Serial.print(F("CallbackUptime: "));
+    Serial.println(data);
+  #endif
+
+  timer.restartTimer(subscribeTimer);
+
+  #ifdef REBOOT_ON
+    timer.restartTimer(rebootTimer);
+  #endif
+}
+
+
+
+void MqttSubscribe(){
 
   #ifdef DEBUG
     unsigned long start_time = millis();
     Serial.println(F("MqttSubscribe() Start"));
   #endif
 
-  if (!mqttClient.connected()){
-    #ifdef DEBUG
-      Serial.print(F("MQTT server not connected"));  Serial.println();
-    #endif
-    return false;
-  }
+  subTopicMotionSensorTimer.setCallback(CallbackMotionSensorTimer);
+  subTopicMotionSensorTimer2.setCallback(CallbackMotionSensorTimer2);
+  subTopicLightType.setCallback(CallbackLightType);
+  subTopicLightType2.setCallback(CallbackLightType2);
+  subTopicUptime.setCallback(CallbackUptime);
 
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.command_pub_topic, motionsensortimer, JConf.mqtt_name);
-  MqttSubscribePrint(topic_buff);
+  mqtt.subscribe(&subTopicMotionSensorTimer);
+  mqtt.subscribe(&subTopicMotionSensorTimer2);
+  mqtt.subscribe(&subTopicLightType);
+  mqtt.subscribe(&subTopicLightType2);
+  mqtt.subscribe(&subTopicUptime);
 
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.command_pub_topic, lightType, JConf.mqtt_name);
-  MqttSubscribePrint(topic_buff);
-
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.command_pub_topic, lightType2, JConf.mqtt_name);
-  MqttSubscribePrint(topic_buff);
-
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.subscribe_topic, uptime, JConf.mqtt_name);
-  MqttSubscribePrint(topic_buff);
-/*
-  sprintf_P(topic_buff, (const char *)F("%s%s%s"), JConf.subscribe_topic, version, JConf.mqtt_name);
-  MqttSubscribePrint(topic_buff);
-*/
+  #ifdef PZEM_ON
+    if (atoi(JConf.pzem_enable) == 1){
+      subTopicPzemReset.setCallback(CallbackPzemReset);
+      mqtt.subscribe(&subTopicPzemReset);
+    }
+  #endif
 
   #ifdef DEBUG
     unsigned long load_time = millis() - start_time;
     Serial.print(F("MqttSubscribe() Load Time: ")); Serial.println(load_time);
-  #endif
-
-  return true;
-}
-
-
-
-void TestMQTTPrint()
-{
-  #ifdef DEBUG
-    unsigned long start_time = millis();
-    Serial.println(F("TestMQTTPrint() Start"));
-  #endif
-
-  int state = mqttClient.state();
-
-  switch (state) {
-    case -4:
-      Serial.println(F("MQTT_CONNECTION_TIMEOUT - the server didn't respond within the keepalive time"));
-      break;
-    case -3:
-      Serial.println(F("MQTT_CONNECTION_LOST - the network connection was broken"));
-      break;
-    case -2:
-      Serial.println(F("MQTT_CONNECT_FAILED - the network connection failed"));
-      break;
-    case -1:
-      Serial.println(F("MQTT_DISCONNECTED - the client is disconnected cleanly"));
-      break;
-    case 0:
-      Serial.println(F("MQTT_CONNECTED - the cient is connected"));    
-      break;
-    case 1:
-      Serial.println(F("MQTT_CONNECT_BAD_PROTOCOL - the server doesn't support the requested version of MQTT"));    
-      break;
-    case 2:
-      Serial.println(F("MQTT_CONNECT_BAD_CLIENT_ID - the server rejected the client identifier"));    
-      break;
-    case 3:
-      Serial.println(F("MQTT_CONNECT_UNAVAILABLE - the server was unable to accept the connection"));    
-      break;
-    case 4:
-      Serial.println(F("MQTT_CONNECT_BAD_CREDENTIALS - the username/password were rejected"));    
-      break;
-    case 5:
-      Serial.println(F("MQTT_CONNECT_UNAUTHORIZED - the client was not authorized to connect"));    
-      break;
-  }
-
-  #ifdef DEBUG
-    unsigned long load_time = millis() - start_time;
-    Serial.print(F("TestMQTTPrint() Load Time: ")); Serial.println(load_time);
   #endif
 }
 
@@ -1547,10 +1689,6 @@ void TestSystemPrint()
   #endif
 
   Serial.println(F("----------------"));
-
-  if (atoi(JConf.mqtt_enable) == 1){
-    TestMQTTPrint();
-  }
 
   Serial.println(__TIMESTAMP__);
 
@@ -1629,12 +1767,13 @@ void WebRoot(void) {
   String panelBodySymbol;       panelBodySymbol += FPSTR(panelBodySymbolP);
   String panelBodyName;         panelBodyName += FPSTR(panelBodyNameP);
   String panelBodyValue;        panelBodyValue += FPSTR(panelBodyValueP);
-  String closingAngleBracket;   closingAngleBracket += FPSTR(closingAngleBracketP);
+  String closingAngleBracket; closingAngleBracket += FPSTR(closingAngleBracketP);
   String panelBodyEnd;          panelBodyEnd += FPSTR(panelBodyEndP);
 
   String title1       = panelHeaderName + String(F("Sensor Data"))   + panelHeaderEnd;
 
-  if (atoi(JConf.bme280_enable) == 1 || atoi(JConf.sht21_enable) == 1){
+  if (atoi(JConf.bme280_enable) == 1 || atoi(JConf.sht21_enable) == 1 || atoi(JConf.dht_enable) == 1 ){
+
     title1           += panelBodySymbol + String(F("fire"))          + panelBodyName + String(F("Temperature")) + panelBodyValue + String(F(" id='temperatureId'")) + closingAngleBracket   + panelBodyEnd;
     title1           += panelBodySymbol + String(F("tint"))          + panelBodyName + String(F("Humidity"))    + panelBodyValue + String(F(" id='humidityId'")) + closingAngleBracket      + panelBodyEnd;
   }
@@ -1645,12 +1784,22 @@ void WebRoot(void) {
     }
   #endif
 
+  #ifdef PZEM_ON
+    if (atoi(JConf.pzem_enable) == 1){
+      title1         += panelBodySymbol + String(F("flash"))         + panelBodyName + String(F("Voltage"))    + panelBodyValue + String(F(" id='pzemVoltageId'")) + closingAngleBracket   + panelBodyEnd;
+      title1         += panelBodySymbol + String(F("flash"))         + panelBodyName + String(F("Current"))    + panelBodyValue + String(F(" id='pzemCurrentId'")) + closingAngleBracket   + panelBodyEnd;
+      title1         += panelBodySymbol + String(F("flash"))         + panelBodyName + String(F("Power"))      + panelBodyValue + String(F(" id='pzemPowerId'"))   + closingAngleBracket   + panelBodyEnd;
+      title1         += panelBodySymbol + String(F("flash"))         + panelBodyName + String(F("Energy"))     + panelBodyValue + String(F(" id='pzemEnergyId'"))  + closingAngleBracket   + panelBodyEnd;
+    }
+  #endif
+
+
   if (atoi(JConf.bh1750_enable) == 1){
     title1           += panelBodySymbol + String(F("asterisk"))      + panelBodyName + String(F("illuminance")) + panelBodyValue + String(F(" id='illuminanceId'")) + closingAngleBracket   + panelBodyEnd;
   }
   
   String title2       = panelHeaderName + String(F("Settings"))      + panelHeaderEnd;
-//  title2             += panelBodySymbol + String(F("signal"))        + panelBodyName + String(F("Wi-Fi SSID"))  + panelBodyValue + closingAngleBracket + (JConf.sta_ssid) + panelBodyEnd;
+  //title2             += panelBodySymbol + String(F("signal"))        + panelBodyName + String(F("Wi-Fi SSID"))  + panelBodyValue + closingAngleBracket + JConf.sta_ssid    + panelBodyEnd;
   title2             += panelBodySymbol + String(F("signal"))        + panelBodyName + String(F("Wi-Fi: ")) + (JConf.sta_ssid)  + panelBodyValue + String(F(" id='WifiRSSIId'")) + closingAngleBracket   + panelBodyEnd;
   title2             += panelBodySymbol + String(F("globe"))         + panelBodyName + String(F("IP Address"))  + panelBodyValue + closingAngleBracket + ipString          + panelBodyEnd;
   title2             += panelBodySymbol + String(F("scale"))         + panelBodyName + String(F("MAC Address")) + panelBodyValue + closingAngleBracket + macString         + panelBodyEnd;
@@ -1664,11 +1813,11 @@ void WebRoot(void) {
 
   title2             += panelBodySymbol + String(F("flash"))         + panelBodyName + String(F("Voltage"))     + panelBodyValue + String(F(" id='vccId'"))        + closingAngleBracket  + panelBodyEnd;
   title2             += panelBodySymbol + String(F("flash"))         + panelBodyName + String(F("Free Memory")) + panelBodyValue + String(F(" id='freeMemoryId'")) + closingAngleBracket  + panelBodyEnd;
-  title2             += panelBodySymbol + String(F("flag"))          + panelBodyName + String(F("Version"))     + panelBodyValue + closingAngleBracket + String(ver)                      + panelBodyEnd;
+  //title2             += panelBodySymbol + String(F("flag"))          + panelBodyName + String(F("Version"))     + panelBodyValue + closingAngleBracket + String(ver)                      + panelBodyEnd;
 
   String data = headerStart + JConf.module_id + headerStart2 + headerEnd + javaScript;
 
-  if (atoi(JConf.bme280_enable) == 1 || atoi(JConf.sht21_enable) == 1) {
+  if (atoi(JConf.bme280_enable) == 1 || atoi(JConf.sht21_enable) == 1 || atoi(JConf.dht_enable) == 1) {
     data += jsTemperature + jsHumidity;
   }
   if (atoi(JConf.bme280_enable) == 1) {
@@ -1678,6 +1827,14 @@ void WebRoot(void) {
     data += jsIlluminance;
     data += jsWifiRSSI;
   }
+
+  #ifdef PZEM_ON
+    if (atoi(JConf.pzem_enable) == 1){
+      String jsPzem;                jsPzem += FPSTR(jsPzemP);
+      data += jsPzem;
+    }
+  #endif
+
   if (atoi(JConf.ntp_enable) == 1) {
     data += jsNtp;
   }
@@ -1859,7 +2016,6 @@ void WebWiFiConf(void) {
     Serial.println(F("WebWiFiConf() Start"));
   #endif
 
-
   String headerStart;           headerStart += FPSTR(headerStartP);
   String headerStart2;          headerStart2 += FPSTR(headerStart2P);
   String headerEnd;             headerEnd += FPSTR(headerEndP);
@@ -1893,7 +2049,6 @@ void WebWiFiConf(void) {
   String inputBodyUnitStart;    inputBodyUnitStart += FPSTR(inputBodyUnitStartP);
   String inputBodyUnitEnd;      inputBodyUnitEnd += FPSTR(inputBodyUnitEndP);
   String inputBodyEnd;          inputBodyEnd += FPSTR(inputBodyEndP);
-
 
   bool config_changed = false;
   bool enable = false;
@@ -1950,7 +2105,7 @@ void WebWiFiConf(void) {
     payload.toCharArray(JConf.static_ip_enable, sizeof(JConf.static_ip_enable));
     config_changed = true;
     enable = true;
-  } 
+  }
 
   payload=WebServer.arg("static_ip");
   if (payload.length() > 6 ) {
@@ -1975,12 +2130,12 @@ void WebWiFiConf(void) {
       JConf.static_ip_enable[0] = '0';
       JConf.static_ip_enable[1] = '\0';
     }
+    timer.deleteTimer(wifiReconnectTimer);
     JConf.saveConfig();
   }
 
   String data = panelHeaderName + String(F("Wi-Fi Configuration")) + panelHeaderEnd;
   data += inputBodyStart;
-
 
   data += inputBodyName + String(F("Module ID")) + inputBodyPOST + String(F("module_id"))  + inputPlaceHolder + JConf.module_id + inputBodyClose + inputBodyCloseDiv;
 
@@ -2096,10 +2251,12 @@ void WebSensorsConf(void) {
 
   bool config_changed = false;
 
+  bool dht_enable = false;
   bool bme280_enable = false;
   bool sht21_enable = false;
   bool bh1750_enable = false;
   bool motion_sensor_enable = false;
+  bool pzem_enable = false;
 
   String payload = "";
 
@@ -2120,6 +2277,12 @@ void WebSensorsConf(void) {
     sht21_enable = true;
   } 
 
+  payload=WebServer.arg("dht_enable");
+  if (payload.length() > 0) {
+    payload.toCharArray(JConf.dht_enable, sizeof(JConf.dht_enable));
+    dht_enable = true;
+  } 
+
   payload=WebServer.arg("bh1750_enable");
   if (payload.length() > 0) {
     payload.toCharArray(JConf.bh1750_enable, sizeof(JConf.bh1750_enable));
@@ -2132,6 +2295,13 @@ void WebSensorsConf(void) {
     motion_sensor_enable = true;
   } 
 
+  payload=WebServer.arg("pzem_enable");
+  if (payload.length() > 0) {
+    payload.toCharArray(JConf.pzem_enable, sizeof(JConf.pzem_enable));
+    pzem_enable = true;
+  } 
+
+
   if (config_changed){
     if (!bme280_enable){
       JConf.bme280_enable[0] = '0';
@@ -2141,39 +2311,60 @@ void WebSensorsConf(void) {
       JConf.sht21_enable[0] = '0';
       JConf.sht21_enable[1] = '\0';
     }
+    if (!dht_enable){
+      JConf.dht_enable[0] = '0';
+      JConf.dht_enable[1] = '\0';
+    }
     if (!bh1750_enable){
       JConf.bh1750_enable[0] = '0';
       JConf.bh1750_enable[1] = '\0';
+      luxString = "0";
     }
     if (!motion_sensor_enable){
       JConf.motion_sensor_enable[0] = '0';
       JConf.motion_sensor_enable[1] = '\0';
     }
+    if (!pzem_enable){
+      JConf.pzem_enable[0] = '0';
+      JConf.pzem_enable[1] = '\0';
+    }
     JConf.saveConfig();
   }
 
   if (atoi(JConf.bme280_enable) == 1){
-    data += String(F("<div class='checkbox'><label><input type='checkbox' name='bme280_enable' value='1' checked='true'>BME280 Enable</label></div>"));
+    data += String(F("<div class='checkbox'><label><input type='checkbox' name='bme280_enable' value='1' checked='true'>BME280</label></div>"));
   } else {
-    data += String(F("<div class='checkbox'><label><input type='checkbox' name='bme280_enable' value='1'>BME280 Enable</label></div>"));
+    data += String(F("<div class='checkbox'><label><input type='checkbox' name='bme280_enable' value='1'>BME280</label></div>"));
   }
 
   if (atoi(JConf.sht21_enable) == 1){
-    data += String(F("<div class='checkbox'><label><input type='checkbox' name='sht21_enable' value='1' checked='true'>SHT21 Enable</label></div>"));
+    data += String(F("<div class='checkbox'><label><input type='checkbox' name='sht21_enable' value='1' checked='true'>SHT21</label></div>"));
   } else {
-    data += String(F("<div class='checkbox'><label><input type='checkbox' name='sht21_enable' value='1'>SHT21 Enable</label></div>"));
+    data += String(F("<div class='checkbox'><label><input type='checkbox' name='sht21_enable' value='1'>SHT21</label></div>"));
+  }
+
+  if (atoi(JConf.dht_enable) == 1){
+    data += String(F("<div class='checkbox'><label><input type='checkbox' name='dht_enable' value='1' checked='true'>DHT</label></div>"));
+  } else {
+    data += String(F("<div class='checkbox'><label><input type='checkbox' name='dht_enable' value='1'>DHT</label></div>"));
   }
 
   if (atoi(JConf.bh1750_enable) == 1){
-    data += String(F("<div class='checkbox'><label><input type='checkbox' name='bh1750_enable' value='1' checked='true'>BH1750 Enable</label></div>"));
+    data += String(F("<div class='checkbox'><label><input type='checkbox' name='bh1750_enable' value='1' checked='true'>BH1750</label></div>"));
   } else {
-    data += String(F("<div class='checkbox'><label><input type='checkbox' name='bh1750_enable' value='1'>BH1750 Enable</label></div>"));
+    data += String(F("<div class='checkbox'><label><input type='checkbox' name='bh1750_enable' value='1'>BH1750</label></div>"));
   }
 
   if (atoi(JConf.motion_sensor_enable) == 1){
-    data += String(F("<div class='checkbox'><label><input type='checkbox' name='motion_sensor_enable' value='1' checked='true'>Motion Sensor Enable</label></div>"));
+    data += String(F("<div class='checkbox'><label><input type='checkbox' name='motion_sensor_enable' value='1' checked='true'>Motion Sensor</label></div>"));
   } else {
-    data += String(F("<div class='checkbox'><label><input type='checkbox' name='motion_sensor_enable' value='1'>Motion Sensor Enable</label></div>"));
+    data += String(F("<div class='checkbox'><label><input type='checkbox' name='motion_sensor_enable' value='1'>Motion Sensor</label></div>"));
+  }
+
+  if (atoi(JConf.pzem_enable) == 1){
+    data += String(F("<div class='checkbox'><label><input type='checkbox' name='pzem_enable' value='1' checked='true'>Energy Monitor</label></div>"));
+  } else {
+    data += String(F("<div class='checkbox'><label><input type='checkbox' name='pzem_enable' value='1'>Energy Monitor</label></div>"));
   }
 
   data += inputBodyEnd;
@@ -2229,12 +2420,10 @@ void WebEspConf(void) {
   String inputBodyUnitEnd;      inputBodyUnitEnd += FPSTR(inputBodyUnitEndP);
   String inputBodyEnd;          inputBodyEnd += FPSTR(inputBodyEndP);
 
-
   bool config_changed = false;
   bool enable_light_smooth = false;
   bool enable_light2_smooth = false;
   String payload = "";
-
 
   payload=WebServer.arg("light_pin");
   if (payload.length() > 0 ) {
@@ -2322,7 +2511,6 @@ void WebEspConf(void) {
     config_changed = true;
   }
 
-
   if (config_changed){
     if (!enable_light_smooth){
       JConf.light_smooth[0] = '0';
@@ -2335,15 +2523,15 @@ void WebEspConf(void) {
     JConf.saveConfig();
   }
 
-
   String data = panelHeaderName + String(F("ESP Configuration")) + panelHeaderEnd;
   data += inputBodyStart;
-
 
   data += String(F("<h4>Light 1</h4>"));
   data += inputBodyName + String(F("Pin")) + inputBodyPOST + String(F("light_pin")) + inputPlaceHolder + JConf.light_pin + inputBodyClose + inputBodyCloseDiv;
   data += inputBodyName + String(F("Off Delay")) + inputBodyPOST + String(F("lightoff_delay")) + inputPlaceHolder + JConf.lightoff_delay + inputBodyClose + inputBodyUnitStart + String(F("min")) + inputBodyUnitEnd + inputBodyCloseDiv;
-  data += inputBodyName + String(F("On Lux")) + inputBodyPOST + String(F("lighton_lux")) + inputPlaceHolder + JConf.lighton_lux + inputBodyClose + inputBodyUnitStart + String(F("Lux")) + inputBodyUnitEnd + inputBodyCloseDiv;
+  if (atoi(JConf.bh1750_enable) == 1){
+    data += inputBodyName + String(F("On Lux")) + inputBodyPOST + String(F("lighton_lux")) + inputPlaceHolder + JConf.lighton_lux + inputBodyClose + inputBodyUnitStart + String(F("Lux")) + inputBodyUnitEnd + inputBodyCloseDiv;
+  }
 
   if (atoi(JConf.light_smooth) == 1){
     data += String(F("<div class='checkbox'><label><input type='checkbox' name='light_smooth' value='1' checked='true'>Smooth Enable</label></div>"));
@@ -2355,7 +2543,9 @@ void WebEspConf(void) {
   data += String(F("<h4>Light 2</h4>"));
   data += inputBodyName + String(F("Pin")) + inputBodyPOST + String(F("light2_pin")) + inputPlaceHolder + JConf.light2_pin + inputBodyClose + inputBodyCloseDiv;
   data += inputBodyName + String(F("Off Delay")) + inputBodyPOST + String(F("light2off_delay")) + inputPlaceHolder + JConf.light2off_delay + inputBodyClose + inputBodyUnitStart + String(F("min")) + inputBodyUnitEnd + inputBodyCloseDiv;
-  data += inputBodyName + String(F("On Lux")) + inputBodyPOST + String(F("light2on_lux")) + inputPlaceHolder + JConf.light2on_lux + inputBodyClose + inputBodyUnitStart + String(F("Lux")) + inputBodyUnitEnd + inputBodyCloseDiv;
+  if (atoi(JConf.bh1750_enable) == 1){
+    data += inputBodyName + String(F("On Lux")) + inputBodyPOST + String(F("light2on_lux")) + inputPlaceHolder + JConf.light2on_lux + inputBodyClose + inputBodyUnitStart + String(F("Lux")) + inputBodyUnitEnd + inputBodyCloseDiv;
+  }
 
   if (atoi(JConf.light2_smooth) == 1){
     data += String(F("<div class='checkbox'><label><input type='checkbox' name='light2_smooth' value='1' checked='true'>Smooth Enable</label></div>"));
@@ -2364,13 +2554,24 @@ void WebEspConf(void) {
   }
   data += String(F("<hr>"));
 
-  data += inputBodyName + String(F("Motion Pin")) + inputBodyPOST + String(F("motion_pin")) + inputPlaceHolder + JConf.motion_pin + inputBodyClose + inputBodyCloseDiv;
-  data += inputBodyName + String(F("DHT Pin")) + inputBodyPOST + String(F("dht_pin")) + inputPlaceHolder + JConf.dht_pin + inputBodyClose + inputBodyCloseDiv;
+  if (atoi(JConf.motion_sensor_enable) == 1){
+    data += inputBodyName + String(F("Motion Pin")) + inputBodyPOST + String(F("motion_pin")) + inputPlaceHolder + JConf.motion_pin + inputBodyClose + inputBodyCloseDiv;
+  }
+
+  if (atoi(JConf.dht_enable) == 1){
+    data += inputBodyName + String(F("DHT Pin")) + inputBodyPOST + String(F("dht_pin")) + inputPlaceHolder + JConf.dht_pin + inputBodyClose + inputBodyCloseDiv;
+  }
   data += String(F("<br>"));
 
   data += inputBodyName + String(F("Update Data Delay")) + inputBodyPOST + String(F("get_data_delay")) + inputPlaceHolder + JConf.get_data_delay + inputBodyClose + inputBodyUnitStart + String(FPSTR(sec)) + inputBodyUnitEnd + inputBodyCloseDiv;
-  data += inputBodyName + String(F("Motion Read Delay")) + inputBodyPOST + String(F("motion_read_delay")) + inputPlaceHolder + JConf.motion_read_delay + inputBodyClose + inputBodyUnitStart + String(FPSTR(sec)) + inputBodyUnitEnd + inputBodyCloseDiv;
-  data += inputBodyName + String(F("Reboot Delay")) + inputBodyPOST + String(F("reboot_delay")) + inputPlaceHolder + JConf.reboot_delay + inputBodyClose + inputBodyUnitStart + String(FPSTR(sec)) + inputBodyUnitEnd + inputBodyCloseDiv;
+
+  if (atoi(JConf.motion_sensor_enable) == 1){
+    data += inputBodyName + String(F("Motion Read Delay")) + inputBodyPOST + String(F("motion_read_delay")) + inputPlaceHolder + JConf.motion_read_delay + inputBodyClose + inputBodyUnitStart + String(FPSTR(sec)) + inputBodyUnitEnd + inputBodyCloseDiv;
+  }
+
+  #ifdef REBOOT_ON
+    data += inputBodyName + String(F("Reboot Delay")) + inputBodyPOST + String(F("reboot_delay")) + inputPlaceHolder + JConf.reboot_delay + inputBodyClose + inputBodyUnitStart + String(FPSTR(sec)) + inputBodyUnitEnd + inputBodyCloseDiv;
+  #endif
 
   data += inputBodyEnd;
 
@@ -2429,8 +2630,8 @@ void WebMqttConf(void) {
 
   bool config_changed = false;
   bool enable = false;
+  bool enable_auth = false;
   String payload = "";
-
 
   payload=WebServer.arg("mqtt_enable");
   if (payload.length() > 0) {
@@ -2451,29 +2652,24 @@ void WebMqttConf(void) {
     config_changed = true;
   }
 
+  payload=WebServer.arg("mqtt_auth_enable");
+  if (payload.length() > 0) {
+    payload.toCharArray(JConf.mqtt_auth_enable, sizeof(JConf.mqtt_auth_enable));
+    config_changed = true;
+    enable_auth = true;
+  }
+
   payload=WebServer.arg("mqtt_user");
   if (payload.length() > 0 ) {
-    if (payload == "0"){
-      String data = "";
-      data.toCharArray(JConf.mqtt_user, sizeof(JConf.mqtt_user));
-      data.toCharArray(JConf.mqtt_pwd, sizeof(JConf.mqtt_pwd));
-    } else {
-      payload.toCharArray(JConf.mqtt_user, sizeof(JConf.mqtt_user));
-    }
+    payload.toCharArray(JConf.mqtt_user, sizeof(JConf.mqtt_user));
     config_changed = true;
   }
 
   payload=WebServer.arg("mqtt_pwd");
-  if (payload.length() > 0 ) {
-    if (payload == "0"){
-      String data = "";
-      data.toCharArray(JConf.mqtt_user, sizeof(JConf.mqtt_user));
-      data.toCharArray(JConf.mqtt_pwd, sizeof(JConf.mqtt_pwd));
-    } else {
-      payload.toCharArray(JConf.mqtt_pwd, sizeof(JConf.mqtt_pwd));
-    }
+  if (payload.length() > 0 &&  payload != String(F("********"))) {
+    payload.toCharArray(JConf.mqtt_pwd, sizeof(JConf.mqtt_pwd));
     config_changed = true;
-  } 
+  }
 
   payload=WebServer.arg("mqtt_name");
   if (payload.length() > 0 ) {
@@ -2507,15 +2703,17 @@ void WebMqttConf(void) {
     config_changed = true;
   }
 
-
   if (config_changed){
     if (!enable){
       JConf.mqtt_enable[0] = '0';
       JConf.mqtt_enable[1] = '\0';
     }
+    if (!enable_auth){
+      JConf.mqtt_auth_enable[0] = '0';
+      JConf.mqtt_auth_enable[1] = '\0';
+    }
     JConf.saveConfig();
   }
-
 
   if (atoi(JConf.mqtt_enable) == 1){
 
@@ -2523,17 +2721,17 @@ void WebMqttConf(void) {
     data += inputBodyName + String(F("Server MQTT")) + inputBodyPOST + String(F("mqtt_server")) + inputPlaceHolder + JConf.mqtt_server + inputBodyClose + inputBodyCloseDiv;
     data += inputBodyName + String(F("Port MQTT")) + inputBodyPOST + String(F("mqtt_port")) + inputPlaceHolder + JConf.mqtt_port + inputBodyClose + inputBodyCloseDiv;
 
-    if (strlen(JConf.mqtt_user) != 0){
-      data += String(F("<div><input type='hidden' name='mqtt_user' value='0'></div>"));
-    } 
-    data += inputBodyName + String(F("MQTT User")) + inputBodyPOST + String(F("mqtt_user")) + inputPlaceHolder + JConf.mqtt_user + inputBodyClose + inputBodyCloseDiv;
+    data += String(F("<hr>"));
+    if (atoi(JConf.mqtt_auth_enable) == 1){
+      data += String(F("<div class='checkbox'><label><input type='checkbox' name='mqtt_auth_enable' value='1' checked='true'>MQTT Authentication</label></div>"));
+      data += inputBodyName + String(F("MQTT User")) + inputBodyPOST + String(F("mqtt_user")) + inputPlaceHolder + JConf.mqtt_user + inputBodyClose + inputBodyCloseDiv;
+      data += inputBodyName + String(F("MQTT Password")) + String(F("</span><input type='password' name='")) + String(F("mqtt_pwd")) + inputPlaceHolder + String(F("********")) + inputBodyClose + inputBodyCloseDiv;
+    } else {
+      data += String(F("<div class='checkbox'><label><input type='checkbox' name='mqtt_auth_enable' value='1'>MQTT Authentication</label></div>"));
+    }
+    data += String(F("<hr>"));
 
-    if (strlen(JConf.mqtt_pwd) != 0){
-      data += String(F("<div><input type='hidden' name='mqtt_pwd' value='0'></div>"));
-    } 
-    data += inputBodyName + String(F("MQTT Password")) + inputBodyPOST + String(F("mqtt_pwd")) + inputPlaceHolder + JConf.mqtt_pwd + inputBodyClose + inputBodyCloseDiv;
-
-    data += inputBodyName + String(F("MQTT Prefix")) + inputBodyPOST + String(F("mqtt_name")) + inputPlaceHolder + JConf.mqtt_name + inputBodyClose + inputBodyCloseDiv;
+    data += inputBodyName + String(F("MQTT Postfix")) + inputBodyPOST + String(F("mqtt_name")) + inputPlaceHolder + JConf.mqtt_name + inputBodyClose + inputBodyCloseDiv;
     data += inputBodyName + String(F("Publish Topic")) + inputBodyPOST + String(F("publish_topic")) + inputPlaceHolder + JConf.publish_topic + inputBodyClose + inputBodyCloseDiv;
     data += inputBodyName + String(F("Subscribe Topic")) + inputBodyPOST + String(F("subscribe_topic")) + inputPlaceHolder + JConf.subscribe_topic + inputBodyClose + inputBodyCloseDiv;
     data += inputBodyName + String(F("Publish Delay")) + inputBodyPOST + String(F("publish_delay")) + inputPlaceHolder + JConf.publish_delay + inputBodyClose + inputBodyUnitStart + String(FPSTR(sec)) + inputBodyUnitEnd + inputBodyCloseDiv;
@@ -2602,7 +2800,6 @@ void WebNTPConf(void) {
   bool enable = false;
   String payload = "";
 
-
   payload=WebServer.arg("ntp_enable");
   if (payload.length() > 0) {
     payload.toCharArray(JConf.ntp_enable, sizeof(JConf.ntp_enable));
@@ -2628,10 +2825,12 @@ void WebNTPConf(void) {
       JConf.ntp_enable[1] = '\0';
     }
     JConf.saveConfig();
+    #ifdef NTP_ON
+      NTPSettingsUpdate();
+    #endif
   }
 
   if (atoi(JConf.ntp_enable) == 1){
-    //data += String(F("<div><input type='hidden' name='ntp_enable' value='0'></div>"));
     data += String(F("<div class='checkbox'><label><input type='checkbox' name='ntp_enable' value='1' checked='true'>NTP Enable</label></div>"));
 
     data += inputBodyName + String(F("Server NTP")) + inputBodyPOST + String(F("ntp_server")) + inputPlaceHolder + JConf.ntp_server + inputBodyClose + inputBodyCloseDiv;
@@ -2680,6 +2879,8 @@ void handleControl(){
         }
       }
       if (WebServer.argName(i) == "1" && WebServer.arg(i) == "2") {
+        lightState = OFF;
+        LightControl();
         lightState = AUTO;
       }
 
@@ -2691,6 +2892,8 @@ void handleControl(){
         }
       }
       if (WebServer.argName(i) == "2" && WebServer.arg(i) == "2") {
+        lightState2 = OFF;
+        LightControl();
         lightState2 = AUTO;
       }
       #ifdef DEBUG
@@ -2775,26 +2978,21 @@ void WebPinControlStatus(void) {
   String ON;              ON += FPSTR(ONP);
   String OFF;             OFF += FPSTR(OFFP);
 
-
-
-
   if (cycleEnd[atoi(JConf.light_pin)] != 0){
     pinState = true;
-    mySwitch.setPulseLength(176);
-    mySwitch.sendTriState(socket13TriStateOn);
+   // mySwitch.setPulseLength(176);
+  //  mySwitch.sendTriState(socket13TriStateOn);
   } else {
     pinState = false;
-    mySwitch.setPulseLength(176);
-    mySwitch.sendTriState(socket13TriStateOff);
   }
-
 
   if (cycleEnd[atoi(JConf.light2_pin)] != 0){
     pinState2 = true;
   } else {
     pinState2 = false;
+   // mySwitch.setPulseLength(176);
+   // mySwitch.sendTriState(socket13TriStateOff);
   }
-
 
   String mode;
   if (lightState == AUTO){
@@ -2814,7 +3012,6 @@ void WebPinControlStatus(void) {
     mode2 = ClassDanger;
   }
 
-
   unsigned long timeOff = 0;
   if (millis() - lightOffTimer < atoi(JConf.lightoff_delay) * 60 * 1000){
     timeOff = atoi(JConf.lightoff_delay) * 60 * 1000 - (millis() - lightOffTimer);
@@ -2828,14 +3025,25 @@ void WebPinControlStatus(void) {
   }
 
   String data;    data += FPSTR(div1P);
-  
+
+  if (atoi(JConf.motion_sensor_enable) == 1){
+    data+=String(F("<td class='active'><h4>Timer</h4></td>"));
+  }
+  data+=FPSTR(div2P);
 
   if (lightState == AUTO) { data+=ClassDefault; } else if (pinState) { data+=ClassDanger; } else { data+=ClassInfo; }
   data+=String(F("' value='"));
   if (pinState) { data+=String(F("Turn Off")); } else { data+=String(F("Turn On")); }
-  data+=String(F("'></div></td><td class='active'><div onclick='Auto1();'><input id='Auto' type='submit' class='btn btn-"));
-  if (lightState == AUTO) { data+=ClassDanger; } else { data+=ClassDefault; }
-  data+=String(F("' value='Auto'></div></td><td class='"));
+  data+=String(F("'></div></td>"));
+
+  if (atoi(JConf.motion_sensor_enable) == 1){
+    data+=String(F("<td class='active'><div onclick='Auto1();'><input id='Auto' type='submit' class='btn btn-"));
+    if (lightState == AUTO) { data+=ClassDanger; } else { data+=ClassDefault; }
+    data+=String(F("' value='Auto'></div></td>"));
+  } else {
+    data+=String(F("<td class='active'></td>"));
+  }
+  data+=String(F("<td class='"));
   if (pinState) { data+=ClassInfo; } else { data+=ClassDanger; }
   data+=String(F("'><h4>"));
   if (pinState) { data+=ON; } else { data+=OFF; }
@@ -2843,20 +3051,34 @@ void WebPinControlStatus(void) {
   data+=mode;    
   data+=String(F("'><h4>"));
   data+=lightState;
-  data+=String(F("</h4></td><td class='"));
-  data+=String(F("active"));
-  data+=String(F("'><h4>"));
-  data+=String(timeOff);
-  data+=String(F("</h4></td></tr>"));
+  data+=String(F("</h4></td>"));
+
+  if (atoi(JConf.motion_sensor_enable) == 1){
+    if (lightState == AUTO && pinState == true){
+      data+=String(F("<td class='active'><h4>"));
+      data+=String(timeOff);
+      data+=String(F("</h4></td>"));
+    } else {
+      data+=String(F("<td class='active'></td>"));
+    }
+  }
+  data+=String(F("</tr>"));
 
 
   data+=String(F("<tr><td class='active'><h4>Light2</h4></td><td class='active'><div onclick='Pin2();'><input id='OnOff2' type='submit' class='btn btn-"));
   if (lightState2 == AUTO) { data+=ClassDefault; } else if (pinState2) { data+=ClassDanger; } else { data+=ClassInfo; }
   data+=String(F("' value='"));
   if (pinState2) { data+=String(F("Turn Off")); } else { data+=String(F("Turn On")); }
-  data+=String(F("'></div></td><td class='active'><div onclick='Auto2();'><input id='Auto2' type='submit' class='btn btn-"));
-  if (lightState2 == AUTO) { data+=ClassDanger; } else { data+=ClassDefault; }
-  data+=String(F("' value='Auto'></div></td><td class='"));
+  data+=String(F("'></div></td>"));
+
+  if (atoi(JConf.motion_sensor_enable) == 1){
+    data+=String(F("<td class='active'><div onclick='Auto2();'><input id='Auto2' type='submit' class='btn btn-"));
+    if (lightState2 == AUTO) { data+=ClassDanger; } else { data+=ClassDefault; }
+    data+=String(F("' value='Auto'></div></td>"));
+  } else {
+    data+=String(F("<td class='active'></td>"));
+  }
+  data+=String(F("<td class='"));
   if (pinState2) { data+=ClassInfo; } else { data+=ClassDanger; }
   data+=String(F("'><h4>"));
   if (pinState2) { data+=ON; } else { data+=OFF; }
@@ -2864,13 +3086,19 @@ void WebPinControlStatus(void) {
   data+=mode2;    
   data+=String(F("'><h4>"));
   data+=lightState2;
-  data+=String(F("</h4></td><td class='"));
-  data+=String(F("active"));
-  data+=String(F("'><h4>"));
-  data+=String(timeOff2);
-  data+=String(F("</h4></td></tr>"));
-  data+=String(F("</tbody></table></div>"));
+  data+=String(F("</h4></td>"));
 
+  if (atoi(JConf.motion_sensor_enable) == 1){
+    if (lightState2 == AUTO && pinState2 == true){
+      data+=String(F("<td class='active'><h4>"));
+      data+=String(timeOff2);
+      data+=String(F("</h4></td>"));
+    } else {
+      data+=String(F("<td class='active'></td>"));
+    }
+  }
+  data+=String(F("</tr>"));
+  data+=String(F("</tbody></table></div>"));
 
   WebServer.send ( 200, "text/html", data);
 
@@ -3032,7 +3260,6 @@ void WebGreenhouse(void) {
 
   data += inputBodyEnd;
 
-
   JConf.saveConfig();
 
   WebServer.send ( 200, "text/html", headerStart + JConf.module_id + headerStart2 + headerEnd + bodyNonAjax + navbarStart + JConf.module_id + navbarStart2 +navbarNonActive + navbarEnd + containerStart + data + containerEnd + siteEnd);
@@ -3074,6 +3301,31 @@ void handleXML(){
   XML+=luxString;
   XML+=String(F(" lux"));
   XML+=String(F("</illuminance>"));
+
+  #ifdef PZEM_ON
+    if (atoi(JConf.pzem_enable) == 1){
+      XML+=String(F("<pzemVoltage>"));
+      XML+=pzemVoltageString;
+      XML+=String(F(" V"));
+      XML+=String(F("</pzemVoltage>"));
+
+      XML+=String(F("<pzemCurrent>"));
+      XML+=pzemCurrentString;
+      XML+=String(F(" A"));
+      XML+=String(F("</pzemCurrent>"));
+
+      XML+=String(F("<pzemPower>"));
+      XML+=pzemPowerString;
+      XML+=String(F(" kW"));
+      XML+=String(F("</pzemPower>"));
+
+      XML+=String(F("<pzemEnergy>"));
+      XML+=pzemEnergyString;
+      XML+=String(F(" kWh"));
+      XML+=String(F("</pzemEnergy>"));
+    }
+  #endif
+
   XML+=String(F("<uptime>"));
   XML+=uptimeString;
   XML+=String(F("</uptime>"));
@@ -3109,47 +3361,8 @@ void handleXML(){
     Serial.print(F("handleXML() Load Time: ")); Serial.println(load_time);
   #endif
 }
-void Telegram(void) {
 
-  #ifdef DEBUG
-    unsigned long start_time = millis();
-    Serial.println(F("Telegram() Start"));
-  #endif
 
-  String headerStart;           headerStart += FPSTR(headerStartP);
-  String headerStart2;          headerStart2 += FPSTR(headerStart2P);
-  String headerRefreshStatus;   headerRefreshStatus += FPSTR(headerRefreshStatusP);
-  String headerEnd;             headerEnd += FPSTR(headerEndP);
-  String bodyNonAjax;           bodyNonAjax += FPSTR(bodyNonAjaxP);
-  String navbarStart;           navbarStart += FPSTR(navbarStartP);
-  String navbarStart2;          navbarStart2 += FPSTR(navbarStart2P);
-  String navbarNonActive;       navbarNonActive += FPSTR(navbarNonActiveP);
-
-  navbarNonActive += FPSTR(navbarBeginP);
-  #ifdef UART_ON
-    navbarNonActive += FPSTR(navbarUartP);
-  #endif
-
-  String navbarEnd;             navbarEnd += FPSTR(navbarEndP);
-  String containerStart;        containerStart += FPSTR(containerStartP);
-  String containerEnd;          containerEnd += FPSTR(containerEndP);
-  String siteEnd;               siteEnd += FPSTR(siteEndP);
-
-  String data = String(F("<div class='col-sm-6 col-md-5 col-lg-4'><div class='page-header'><h2>Telegram send message</h2></div><div class='alert alert-info' role='alert'><a href='#' class='alert-link'>Rebooting...</a></div></div>"));
-  WebServer.send ( 200, "text/html", headerStart + JConf.module_id + headerStart2 + headerRefreshStatus + headerEnd + bodyNonAjax + navbarStart + JConf.module_id + navbarStart2 +navbarNonActive + navbarEnd + containerStart + data + containerEnd + siteEnd);
-
-    mySwitch.setPulseLength(176);
-    mySwitch.sendTriState(socket13TriStateOn);
-    delay(7000);
-    mySwitch.setPulseLength(176);
-    mySwitch.sendTriState(socket13TriStateOff);
-        
-  #ifdef DEBUG
-    unsigned long load_time = millis() - start_time;
-    Serial.print(F("Telegram() Load Time: ")); Serial.println(load_time);
-  #endif
-
-}
 
 void WebServerInit()
 {
@@ -3165,18 +3378,12 @@ void WebServerInit()
   WebServer.on("/update", WebUpdate);
   WebServer.onFileUpload(WebFileUpload);
   WebServer.on("/upload_sketch", WebUploadSketch);
-  //WebServer.on("/upload_sketch", HTTP_POST, WebFileUpload);
-
-
   WebServer.on("/wificonf", WebWiFiConf);
-
   WebServer.on("/sensorsconf", WebSensorsConf);
   WebServer.on("/espconf", WebEspConf);
   WebServer.on("/mqttconf", WebMqttConf);
   WebServer.on("/ntpconf", WebNTPConf);
-
   WebServer.on("/control", handleControl);
-
   WebServer.on("/pincontrol", WebPinControl);
   WebServer.on("/controlstatus", WebPinControlStatus);
 
@@ -3187,7 +3394,7 @@ void WebServerInit()
   WebServer.on("/greenhouse", WebGreenhouse);
 
   WebServer.on("/xml",handleXML);
-  WebServer.on("/telegram", Telegram); 
+
 /*
   WebServer.on("/upload", HTTP_GET, handle_upload);
   WebServer.on("/upload", HTTP_POST, handle_upload_post, handleFileUpload);
@@ -3202,26 +3409,125 @@ void WebServerInit()
     unsigned long load_time = millis() - start_time;
     Serial.print(F("WebServerInit() Load Time: ")); Serial.println(load_time);
   #endif
-//  bot.begin();      // launch Bot functionalities
+}
+
+
+
+void getData(){
+
+  #ifdef NTP_ON
+    if (atoi(JConf.ntp_enable) == 1) {
+      timeClient.update();
+      ntpTimeString = timeClient.getFormattedTime();
+    }
+  #endif
+
+  int voltage = ESP.getVcc();
+  voltage_float = voltage / 1000.0;
+
+  #ifdef BH1750_ON
+    if (atoi(JConf.bh1750_enable) == 1){
+      GetLightSensorData();
+    }
+  #endif
+
+  #ifdef BME280_ON
+    if (atoi(JConf.bme280_enable) == 1){
+      GetBmeSensorData();
+    }
+  #endif
+
+  #ifdef SHT21_ON
+    if (atoi(JConf.sht21_enable) == 1){
+      GetSHT21SensorData();
+    }
+  #endif
+
+  #ifdef DHT_ON
+    if (atoi(JConf.dht_enable) == 1){
+      DHT22Sensor();
+    }
+  #endif
+
+  #ifdef PZEM_ON
+    if (atoi(JConf.pzem_enable) == 1){
+      GetPzemSerialRead();
+    }
+  #endif
+
+  GetUptimeData();
+  GetFreeMemory();
+  GetMacString();
+
+  #ifdef DEBUG
+    TestSystemPrint();
+  #endif
+
+  #ifdef UART_ON
+  for (int i = 0; i < ANALOG_PINS; i++){
+    if (millis() - Uart.timerAnalogPin[i] >= 60000){
+      Uart.valueAnalogPin[i] = 0;
+      Uart.SetAnalogReadCycle(i, 10, "s");
+    } else {
+
+    }
+  }
+  #endif
+}
+
+
+
+void restartESP() {
+  ESP.restart();
+}
+
+
+
+void deleteConfigFile() {
+  pinMode(atoi(JConf.reset_pin), INPUT); 
+  if (digitalRead(atoi(JConf.reset_pin)) == LOW) {
+    delay(3000);
+    if (digitalRead(atoi(JConf.reset_pin)) == LOW) {
+      #ifdef DEBUG
+        Serial.println(F("Reset pin pressed. Delete config file."));
+      #endif
+      JConf.deleteConfig();
+    }
+  } 
 }
 
 
 
 void setup() {
 
-  // Setup console
   #ifdef DEBUG
     Serial.begin(115200);
     delay(10);
     Serial.println();
   #endif
+
+  #ifdef PZEM_ON
+    Serial.begin(9600);
+    delay(500);
+    Serial.println();
+  #endif
   
   if (!SPIFFS.begin()) {
     #ifdef DEBUG
-    Serial.println(F("Failed to mount file system"));
+      Serial.println(F("Failed to mount file system"));
     #endif
+
     return;
+  } else {
+    #ifdef RESET_BUTTON_ON
+      deleteConfigFile();
+    #endif
   }
+Wire.begin(13,14); //SDA=4, SCL=5
+
+   mySwitch.enableTransmit(5);
+   mySwitch.setPulseLength(179); 
+
 /*
   if (!JConf.saveConfig()) {
     Serial.println("Failed to save config");
@@ -3231,223 +3537,119 @@ void setup() {
 */
   if (!JConf.loadConfig()) {
     #ifdef DEBUG
-    Serial.println(F("Failed to load config"));
+      Serial.println(F("Failed to load config"));
     #endif
   } else {
     #ifdef DEBUG
-    Serial.println(F("Config loaded"));
+      Serial.println(F("Config loaded"));
     #endif
   }
   JConf.printConfig();
 
   pinMode(atoi(JConf.light_pin), OUTPUT);
   pinMode(atoi(JConf.light2_pin), OUTPUT);
-  pinMode(atoi(JConf.motion_pin), INPUT);           // set pin to input
+  pinMode(atoi(JConf.motion_pin), INPUT);
 
   digitalWrite(atoi(JConf.light_pin), LOW);
   digitalWrite(atoi(JConf.light2_pin), LOW);
 
-  #ifdef SHT21_ON
-  myHTU21D.begin(13, 14);
+  #ifdef PZEM_ON
+    pzem.setAddress(ip_pzem);
+    pzem.setReadTimeout(500);
   #endif
 
   #ifdef DHT_ON
+    dht = DHT(atoi(JConf.dht_pin), DHTTYPE);
     dht.begin();
   #endif
 
+  #ifdef BME280_ON
   if (atoi(JConf.bme280_enable) == 1) {
-    #ifdef BME280_ON
-      bmeSensor.settings.commInterface = I2C_MODE;
-      bmeSensor.settings.I2CAddress = 0x76;
-      bmeSensor.settings.runMode = 3;
-      bmeSensor.settings.tStandby = 0;
-      bmeSensor.settings.filter = 4;
-      bmeSensor.settings.tempOverSample = 5;
-      bmeSensor.settings.pressOverSample = 5;
-      bmeSensor.settings.humidOverSample = 5;
-      bmeSensor.begin();
-    #endif
+    bmeSensor.settings.commInterface = I2C_MODE;
+    bmeSensor.settings.I2CAddress = 0x76;
+    bmeSensor.settings.runMode = 3;
+    bmeSensor.settings.tStandby = 0;
+    bmeSensor.settings.filter = 4;
+    bmeSensor.settings.tempOverSample = 5;
+    bmeSensor.settings.pressOverSample = 5;
+    bmeSensor.settings.humidOverSample = 5;
+    bmeSensor.begin();
   }
+  #endif
 
-  Wire.begin(13,14); //SDA=4, SCL=5
-
-  if (atoi(JConf.bh1750_enable) == 1) {
-    lightSensor.begin();
-  }
+  #ifdef BH1750_ON
+    if (atoi(JConf.bh1750_enable) == 1) {
+      lightSensor.begin();
+    }
+  #endif
 
   if (atoi(JConf.bme280_enable) == 1 || atoi(JConf.bh1750_enable) == 1 || atoi(JConf.sht21_enable) == 1) {
     Wire.setClock(100000);
   }
 
-  // scan Access Points
-  scanWiFi();
+  #ifdef SHT21_ON
+    myHTU21D.begin(13, 14);  //SDA=4, SCL=5
+  #endif
 
+  scanWiFi();  // scan Access Points
 
   if (!WiFiSetup()) {
     WiFiSafeSetup();
   }
-  delay(2000);
-
+  delay(1000);
 
   if (atoi(JConf.mqtt_enable) == 1) {
-    mqttClient.setClient(espClient);
-
-    if (isIPValid(JConf.mqtt_server)){
-      IPAddress mqtt_ip = stringToIp(JConf.mqtt_server);
-      mqttClient.setServer(mqtt_ip, atoi(JConf.mqtt_port));
+    if (atoi(JConf.mqtt_auth_enable) == 1){
+      mqtt = Adafruit_MQTT_Client(&espClient, JConf.mqtt_server, atoi(JConf.mqtt_port), JConf.mqtt_user, JConf.mqtt_pwd);
     } else {
-      mqttClient.setServer(JConf.mqtt_server, atoi(JConf.mqtt_port));
+      mqtt = Adafruit_MQTT_Client(&espClient, JConf.mqtt_server, atoi(JConf.mqtt_port));
     }
-    
-    mqttClient.setCallback (callback);
+    MqttInit();
+    MqttSubscribe();
+    MQTT_connect();
   }
-
 
   WebServerInit();
 
-
-  #ifdef DEBUG
-  Serial.println();  Serial.println(F("Server started"));
-  #endif
-
-/*
-  // start mDNS responder
-  if (!MDNS.begin(JConf.module_id)) {
-    #ifdef DEBUG
-    Serial.println();  Serial.println(F("Error setting up MDNS responder!"));
-    #endif
-    while (1) {
-      delay(1000);
-      yield();
+  #ifdef NTP_ON
+    if (atoi(JConf.ntp_enable) == 1) {
+      timeClient.setUpdateServer(JConf.ntp_server);
+      timeClient.setTimeOffset(atoi(JConf.my_time_zone) * 60 * 60);
+      timeClient.setUpdateInterval(60*60*1000);
+      timeClient.begin();
     }
-  }
-  #ifdef DEBUG
-  Serial.println();  Serial.println(F("mDNS responder started"));
   #endif
 
-  // Add service to MDNS-SD
-  MDNS.addService("http", "tcp", 80);
-
-*/
-
-  
-  if (atoi(JConf.ntp_enable) == 1) {
-  timeClient.begin();
+  wifiReconnectTimer = timer.setInterval(10000, wifiReconnect);
+  timer.setInterval(atoi(JConf.get_data_delay) * 1000, getData);
+//////////////////////////// ASEMOCHKIN
+if (atoi(JConf.mqtt_enable) == 1) {
+  timer.setInterval(60000, MQTT_connect);
+  timer.setInterval(atoi(JConf.publish_delay) * 1000, MqttPubData);
+}
+//////////////////////
+  if (atoi(JConf.motion_sensor_enable) == 1){
+    timer.setInterval(atoi(JConf.motion_read_delay) * 1000, MotionDetect);
   }
-   mySwitch.enableTransmit(5);
-   mySwitch.setPulseLength(179); 
 
+  subscribeTimer = timer.setInterval(atoi(JConf.subscribe_delay) * 1000, MqttSubscribe);
+  timer.setInterval(600000, wifiSafeModeReconnect);
 
-  
+  #ifdef REBOOT_ON
+    rebootTimer = timer.setInterval(atoi(JConf.reboot_delay) * 1000, restartESP);
+  #endif
 }
 
 
 
 void loop() {
- /* 
-  if (millis() > Bot_lasttime + Bot_mtbs)  {
-    bot.getUpdates(bot.message[0][1]);   // launch API GetUpdates up to xxx message
-    yield();
-    Bot_ExecMessages();   // reply to message with Echo
-    yield();
-    Bot_lasttime = millis();
-  }
-  */
-  #ifdef DEBUG
-    unsigned long start_time = millis();
-  #endif
 
-  // handle web server
-  WebServer.handleClient();
+  WebServer.handleClient();  // handle web server
 
-  #ifdef DEBUG
-    unsigned long load_time1 = millis() - start_time;
-    if (load_time1 > 100){
-      Serial.print(F("WebServer.handleClient() Load Time:             ")); Serial.println(load_time1);
-    }
-  #endif
+  timer.run();
 
-  if (millis() - getDataTimer >= atoi(JConf.get_data_delay) * 1000){
-    getDataTimer = millis();
-
-    if (atoi(JConf.ntp_enable) == 1) {
-      timeClient.update();
-      ntpTimeString = timeClient.getFormattedTime();
-    }
-
-    int voltage = ESP.getVcc();
-    voltage_float = voltage / 1000.0;
-    #ifdef REBOOT_ON
-      RebootESP();
-    #endif
-
-    if (atoi(JConf.bh1750_enable) == 1){
-      GetLightSensorData();
-    }
-
-    #ifdef BME280_ON
-      if (atoi(JConf.bme280_enable) == 1){
-        GetBmeSensorData();
-      }
-    #endif
-
-    #ifdef SHT21_ON
-      if (atoi(JConf.sht21_enable) == 1){
-        GetSHT21SensorData();
-      }
-    #endif
-
-    #ifdef DEBUG
-      unsigned long load_time4 = millis() - start_time;
-      if (load_time4 > 100){
-        Serial.print(F("Get Sensors Load Time:                          ")); Serial.println(load_time4);
-      }
-    #endif
-
-
-    GetUptimeData();
-    GetFreeMemory();
-
-    GetMacString();
-
-    #ifdef DHT_ON
-      DHT22Sensor();
-    #endif
-
-    #ifdef DEBUG
-      TestSystemPrint();
-    #endif
-
-    #ifdef UART_ON
-    for (int i = 0; i < ANALOG_PINS; i++){
-      if (millis() - Uart.timerAnalogPin[i] >= 60000){
-        Uart.valueAnalogPin[i] = 0;
-        Uart.SetAnalogReadCycle(i, 10, "s");
-      } else {
-
-      }
-    }
-    #endif
-  }
-
-  #ifdef DEBUG
-    unsigned long load_time2 = millis() - start_time;
-    if (load_time2 > 100){
-      Serial.print(F("Get Data Load Time:                             ")); Serial.println(load_time2);
-    }
-  #endif
-
-
-  if (atoi(JConf.motion_sensor_enable) == 1){
-    if (motionDetect == false){
-      MotionDetect();
-    }  
-
-    if (millis() - motionTimer >= atoi(JConf.motion_read_delay) * 1000){
-      motionTimer = millis();
-      motionDetect = false;
-      MotionDetect();
-    }
+  if (atoi(JConf.motion_sensor_enable) == 1 && motionDetect == false){
+    MotionDetect();
   }
 
   String AUTO;   AUTO += FPSTR(AUTOP);
@@ -3455,81 +3657,15 @@ void loop() {
     LightControl();
   }
 
-
-  if (WiFi.status() != WL_CONNECTED && atoi(JConf.wifi_mode) != AP && wifiSafeMode == false) {
-    #ifdef DEBUG
-    Serial.print(F("Connecting "));
-    Serial.println(F("..."));
-    #endif
-
-    WiFiSetup();
-
-/*
-    if (WiFi.waitForConnectResult() != WL_CONNECTED)
-      return;
-*/
-  }
-
-  if (wifiSafeMode == true && millis() - wifiSafeModeReconnectTimer >= wifiSafeModeReconnectDelay ) {
-     wifiSafeModeReconnectTimer = millis();
-     if ( WiFiSetup() ) {
-       wifiSafeMode = false; 
-     }
-   }
-/*
-  if (WiFi.status() != WL_CONNECTED) {
-    #ifdef DEBUG
-    Serial.print(F("Connecting to "));
-    Serial.print(JConf.sta_ssid);
-    Serial.println(F("..."));
-    #endif
-    WiFi.mode(WIFI_AP_STA);
-    WiFi.begin(JConf.sta_ssid, JConf.sta_pwd);
-    delay(100);
-
-    if (WiFi.waitForConnectResult() != WL_CONNECTED)
-      return;
-    #ifdef DEBUG
-    Serial.println(F("WiFi connected"));
-    #endif
-  }
-*/
-
-  if (WiFi.status() == WL_CONNECTED) {
-
-    if (atoi(JConf.mqtt_enable) == 1) {
-
-      if (!mqttClient.connected()) {
-        if (JConf.mqtt_user != "" && JConf.mqtt_pwd != ""){
-          mqttClient.connect(JConf.mqtt_name, JConf.mqtt_user, JConf.mqtt_pwd);
-        } else {
-          mqttClient.connect(JConf.mqtt_name);
-        }
-      } else {
-        mqttClient.loop();
-        if (millis() - subscribeTimer >= atoi(JConf.subscribe_delay) * 1000) {
-          subscribeTimer = millis();
-          MqttSubscribe();
-        }
-      }
-
-      if (millis() - publishTimer >= atoi(JConf.publish_delay) * 1000){
-        publishTimer = millis();
-        MqttPubData();
-      }
+  if (WiFi.status() == WL_CONNECTED && atoi(JConf.mqtt_enable) == 1) {
+    if (mqtt.connected()){
+      mqtt.processPackets(100);
     }
   }
 
   #ifdef UART_ON
-  Uart.serialEvent();
+    Uart.serialEvent();
   #endif
 
   FadeSwitchLoop();
-
-  #ifdef DEBUG
-    unsigned long load_time3 = millis() - start_time;
-    if (load_time3 > 100){
-      Serial.print(F("loop() Load Time:                               ")); Serial.println(load_time3);
-    }
-  #endif
 }
