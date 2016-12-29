@@ -34,8 +34,8 @@ DeviceAddress DS18B20Address;
 #define RelayOn LOW // полярность сигнала включения реде (HIGH/LOW)
 
 Servo myservo;  // create servo object to control a servo
-volatile int pos = 0;    // variable to store the servo position
-
+ int pos = constrain(pos, 0, 180);    // variable to store the servo position
+//volatile int pos = constrain(pos, 0, 180);    // variable to store the servo position
 SimpleTimer timer; 
 // Set the LCD address to 0x27 for a 16 chars and 2 line display
 LiquidCrystal_I2C lcd(0x3F, 16, 2);
@@ -45,7 +45,7 @@ byte block1[8] = {
 byte block2[8] = {
   0x06,0x09,0x09,0x06,0x00,0x00,0x00,0x00 }; // значок градуса
  
-#define serialenabled // раскомментировать для выдачи в порт отладочной инфы
+//#define serialenabled // раскомментировать для выдачи в порт отладочной инфы
  
 #define TstatTimerMax 2 //минимальная пауза между включениями горелки, сек
 unsigned int TstatTimer = 20; //таймер паузы между включениями/выключениями, начальная установка 20 сек для устаканивания системы после сброса
@@ -315,16 +315,27 @@ void loop() {
   if ((encoderR)|(encoderL)) {
     if (encoderR) {
       TstatTemp += 0.1;
-      pos=pos+10;
+      pos=pos + 5;
+//      myservo.attach(9);  // attaches the servo on pin 9 to the servo object 
       myservo.write(pos); 
-      delay(15);
+      delay(25);
+//      myservo.detach();  // attaches the servo on pin 9 to the servo object
     }
     else
     {
       TstatTemp -= 0.1;
-      pos = pos-10;
-      myservo.write(pos); 
-      delay(15);
+/* 
+  for (pos > 0; 10; pos -= 1) { // goes from 180 degrees to 0 degrees
+    myservo.write(pos);              // tell servo to go to position in variable 'pos'
+    delay(15);                       // waits 15ms for the servo to reach the position
+  }
+      
+*/      
+      pos = pos - 5;
+      //myservo.attach(9);  // attaches the servo on pin 9 to the servo object 
+      myservo.write(pos);
+      delay(25);
+     // myservo.detach();  // attaches the servo on pin 9 to the servo object 
     }
     TstatTemp = constrain(TstatTemp, 10, 35);
     encoderR = false;
