@@ -11,8 +11,8 @@
 #include <RealTimeClockDS1307.h> // RTC
 #include <EEPROMex.h> // EE
 #include <LiquidCrystal_I2C.h>
-#include <TimerOne.h> // прерывания по таймеру1
- 
+//#include <TimerOne.h> // прерывания по таймеру1
+#include <SimpleTimer.h> 
 #include <OneWire.h> // 1wire для DS18B20
 #include <DallasTemperature.h> // DS18B20
  
@@ -31,7 +31,7 @@ DeviceAddress DS18B20Address;
 #define BeepToneYesDuration 200 // длительность звука "Yes", мс
 #define Relay  7 // нога, к которой подключено реле
 #define RelayOn LOW // полярность сигнала включения реде (HIGH/LOW)
- 
+SimpleTimer timer; 
 // Set the LCD address to 0x27 for a 16 chars and 2 line display
 LiquidCrystal_I2C lcd(0x3F, 16, 2);
  
@@ -117,8 +117,9 @@ void setup() {
   pinMode(encoderK, INPUT);digitalWrite(encoderK, HIGH);
   attachInterrupt(0, doEncoderA, CHANGE);   // encoder pin on interrupt 0 (pin 2)
   attachInterrupt(1, doEncoderB, CHANGE);  // encoder pin on interrupt 1 (pin 3)
-  Timer1.initialize(500000); // Timer0 interrupt - set a timer of length 500000 microseconds
-  Timer1.attachInterrupt( timerIsr ); // attach the service routine here
+  timer.setInterval(500, repeatMe);
+ //  Timer1.initialize(500000); // Timer0 interrupt - set a timer of length 500000 microseconds
+//  Timer1.attachInterrupt( timerIsr ); // attach the service routine here
   EEPROM.setMaxAllowedWrites(32767);
   if ((digitalRead(encoderK)) == 0)
   { // если первая запись однокристалки (зажата кнопка при включении питания)- записать начальные значения в EE
@@ -647,6 +648,7 @@ void loop() {
     delay(200);
     lcd.clear();
   }
+timer.run();
 }
  
 // ===== SUBROUTINES ==================================================================
@@ -819,7 +821,7 @@ void doEncoderB(){
 }
 // ============================ Timer0 interrupt =============================
 // run every 500ms
-void timerIsr()
+void repeatMe()
 {
   blink500ms = !blink500ms; // инверсия мерцающего бита
   if(blink500ms) {
