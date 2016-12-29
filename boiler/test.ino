@@ -11,7 +11,8 @@
 #include <RealTimeClockDS1307.h> // RTC
 #include <EEPROMex.h> // EE
 #include <LiquidCrystal_I2C.h>
-#include <TimerOne.h> // прерывания по таймеру1
+//#include <TimerOne.h> // прерывания по таймеру1
+#include <SimpleTimer.h> 
 #include <Servo.h>
 #include <OneWire.h> // 1wire для DS18B20
 #include <DallasTemperature.h> // DS18B20
@@ -24,20 +25,21 @@ DeviceAddress DS18B20Address;
 #define encoderA    2 // энкодер - поворот вправо (об землю)
 #define encoderB    3 // энкодер - поворот влево (об землю)
 #define encoderK    4 // энкодер - кнопка (об землю)
-#define BeepPin     12 // пищалка
-#define BeepToneNo  3000 // тон звука "No", герц
+#define BeepPin     11 // пищалка
+#define BeepToneNo  2000 // тон звука "No", герц
 #define BeepToneYes 4000 // тон звука "Yes", герц
-#define BeepToneNoDuration 300 // длительность звука "No", мс
-#define BeepToneYesDuration 400 // длительность звука "Yes", мс
+#define BeepToneNoDuration 200 // длительность звука "No", мс
+#define BeepToneYesDuration 200 // длительность звука "Yes", мс
 #define Relay  7 // нога, к которой подключено реле
 #define RelayOn LOW // полярность сигнала включения реде (HIGH/LOW)
- 
+
+Servo myservo;  // create servo object to control a servo
+volatile int pos = 0;    // variable to store the servo position
+
+SimpleTimer timer; 
 // Set the LCD address to 0x27 for a 16 chars and 2 line display
 LiquidCrystal_I2C lcd(0x3F, 16, 2);
-Servo myservo;  // create servo object to control a servo
-
-int pos = 0;    // variable to store the servo position
-
+ 
 byte block1[8] = {
   0x06,0x09,0x09,0x06,0x00,0x04,0x0E,0x1F }; // значок градуса с пламенем снизу
 byte block2[8] = {
@@ -121,8 +123,9 @@ void setup() {
   pinMode(encoderK, INPUT);digitalWrite(encoderK, HIGH);
   attachInterrupt(0, doEncoderA, CHANGE);   // encoder pin on interrupt 0 (pin 2)
   attachInterrupt(1, doEncoderB, CHANGE);  // encoder pin on interrupt 1 (pin 3)
-  Timer1.initialize(5000000); // Timer0 interrupt - set a timer of length 500000 microseconds
-  Timer1.attachInterrupt( timerIsr ); // attach the service routine here
+  timer.setInterval(500, repeatMe);
+ //  Timer1.initialize(500000); // Timer0 interrupt - set a timer of length 500000 microseconds
+//  Timer1.attachInterrupt( timerIsr ); // attach the service routine here
   EEPROM.setMaxAllowedWrites(32767);
   if ((digitalRead(encoderK)) == 0)
   { // если первая запись однокристалки (зажата кнопка при включении питания)- записать начальные значения в EE
@@ -174,12 +177,13 @@ void setup() {
   RTC.start();
  
 }
+
 int cPos=0;// текущие положение сервы
 void setServo(int newPosition){
   myservo.write(newPosition); // выкрутили серву 
   cPos=newPosition; // запомнили положение сервы
 }
- 
+
 // ===== MAIN CYCLE ===================================================================
 void loop() {
   lcd.setCursor(8, 0); //инфо на LCD
@@ -312,15 +316,15 @@ void loop() {
     if (encoderR) {
       TstatTemp += 0.1;
       pos=pos+10;
-      
-      Serial.println(pos);
+      myservo.write(pos); 
+      delay(15);
     }
     else
     {
       TstatTemp -= 0.1;
       pos = pos-10;
-
-      Serial.println(pos);      
+      myservo.write(pos); 
+      delay(15);
     }
     TstatTemp = constrain(TstatTemp, 10, 35);
     encoderR = false;
@@ -331,13 +335,6 @@ void loop() {
   // ================ по нажатию кнопки энкодера - меню настроек ====================
   if(digitalRead(encoderK) == 0) {
     MenuTimeoutTimer = 10; //таймер таймаута, секунд
-    Serial.print("Send to Servo: ");
-    Serial.print(pos);
-    //myservo.attach(9);
-     myservo.write(pos); //setServo(pos);
-    //myservo.detach();
-    yield();
-    delay(15); 
     lcd.clear();
     lcd.setCursor(0, 0); //инфо на LCD
     lcd.print(F("< SETUP >")); 
@@ -669,6 +666,7 @@ void loop() {
     delay(200);
     lcd.clear();
   }
+timer.run();
 }
  
 // ===== SUBROUTINES ==================================================================
@@ -814,7 +812,7 @@ void doEncoderA(){
     {
       MenuTimeoutTimer = 10; //таймер таймаута, секунд
       if (BeepEnabled) {
-        tone(BeepPin,5000,10);
+        tone(BeepPin,4000,5);
       }
       encoderR = true;
       rotating = false;  // no more debouncing until loop() hits again
@@ -832,7 +830,7 @@ void doEncoderB(){
     if( B_set && !A_set ) {
       MenuTimeoutTimer = 10; //таймер таймаута, секунд
       if (BeepEnabled) {
-        tone(BeepPin,4800,10);
+        tone(BeepPin,4000,5);
       }
       encoderL = true;
       rotating = false;
@@ -841,7 +839,7 @@ void doEncoderB(){
 }
 // ============================ Timer0 interrupt =============================
 // run every 500ms
-void timerIsr()
+void repeatMe()
 {
   blink500ms = !blink500ms; // инверсия мерцающего бита
   if(blink500ms) {
