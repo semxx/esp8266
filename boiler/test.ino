@@ -25,11 +25,11 @@ DeviceAddress DS18B20Address;
 #define encoderA    2 // энкодер - поворот вправо (об землю)
 #define encoderB    3 // энкодер - поворот влево (об землю)
 #define encoderK    4 // энкодер - кнопка (об землю)
-#define BeepPin     11 // пищалка
-#define BeepToneNo  2000 // тон звука "No", герц
+#define BeepPin     12 // пищалка
+#define BeepToneNo  3000 // тон звука "No", герц
 #define BeepToneYes 4000 // тон звука "Yes", герц
-#define BeepToneNoDuration 200 // длительность звука "No", мс
-#define BeepToneYesDuration 200 // длительность звука "Yes", мс
+#define BeepToneNoDuration 300 // длительность звука "No", мс
+#define BeepToneYesDuration 400 // длительность звука "Yes", мс
 #define Relay  7 // нога, к которой подключено реле
 #define RelayOn LOW // полярность сигнала включения реде (HIGH/LOW)
 
@@ -812,7 +812,7 @@ void doEncoderA(){
     {
       MenuTimeoutTimer = 10; //таймер таймаута, секунд
       if (BeepEnabled) {
-        tone(BeepPin,4000,5);
+        tone(BeepPin,5000,10);
       }
       encoderR = true;
       rotating = false;  // no more debouncing until loop() hits again
@@ -830,7 +830,7 @@ void doEncoderB(){
     if( B_set && !A_set ) {
       MenuTimeoutTimer = 10; //таймер таймаута, секунд
       if (BeepEnabled) {
-        tone(BeepPin,4000,5);
+        tone(BeepPin,4800,10);
       }
       encoderL = true;
       rotating = false;
