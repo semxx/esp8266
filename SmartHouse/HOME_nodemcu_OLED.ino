@@ -92,7 +92,7 @@ char Floor_1_Text[11] = "1_flr";
 char Floor_2_Text[11] = "2_flr";
 
 int Auto_Temp = 75;     // Дефолтовая автоматически поддерживаемая температура.
-int Alarm_Temp = 90;    // Критическия температура, при достежении шлем СМС и все отключаем
+int Alarm_Temp = 85;    // Критическия температура, при достежении шлем СМС и все отключаем
 
 //  Ниже не значения, а адреса ячеек ПЗУ
 int Addr_Auto_Temp = 0;   // Адрес в ПЗУ для Auto_Temp
@@ -116,7 +116,6 @@ void setup()
 {
   Beep(780, 50);
   Last_Tel_Number=First_Number;
-  Serial.begin(9600);
   #ifdef ENCODER_ON
     encoderSetup();
   #endif //ENCODER_ON
@@ -140,7 +139,7 @@ void setup()
   digitalWrite(Relay_5, LOW);
   digitalWrite(Relay_6, LOW);
 
-
+  EEPROM.begin(512);
 
   Serial.begin(9600);
   gprsSerial.begin(9600);
@@ -153,7 +152,7 @@ void setup()
   sensorsDS18B20.requestTemperatures();
   UpdateTemp();
   SendStatus();
-
+  //  fillHistory();
   // clock.fillByYMD(2016,01,07);
   // clock.fillByHMS(21,51,00);
   // clock.setTime();
@@ -184,12 +183,12 @@ void loop()
   if (currentTime > Next_Update_Temp)  {         // время обновить температуру
     UpdateTemp();
     Next_Update_Temp =  millis() + 30000;           // отсчитываем по 30 секунд
-    Check_GSM();
+  //  Check_GSM();
   }
 
   if (currentTime > Next_Update_Screen_Saver) {    // время включать скринсейвер на экране
     num_Screen = 0; 
-    Next_Update_Screen_Saver =  millis() + 30000;  // отсчитываем по 30 секунд
+    Next_Update_Screen_Saver =  millis() + 60000;  // отсчитываем по 60 секунд
   }
 } // END LOOP
 
@@ -203,8 +202,6 @@ void Beep(word frq, word dur)
     noTone(Speaker);
 }
 
-
-
 void Ring()
 {
   Beep(780, 100);
@@ -215,9 +212,10 @@ void Ring()
 
 // чтение из ПЗУ
 int EEPROM_int_read(int addr) {
-  byte raw[2];
-  for (byte i = 0; i < 2; i++) raw[i] = EEPROM.read(addr + i);
-  int &num = (int&)raw;
+ int num = EEPROM.read(addr);
+ // byte raw[2];
+ // for (byte i = 0; i < 2; i++) raw[i] = EEPROM.read(addr + i);
+ // int &num = (int&)raw;
   return num;
 }
 
@@ -226,6 +224,7 @@ void EEPROM_int_write(int addr, int num) {
   byte raw[2];
   (int&)raw = num;
   for (byte i = 0; i < 2; i++) EEPROM.write(addr + i, raw[i]);
+EEPROM.commit();
 }
 
 void ReadButton()
@@ -254,6 +253,7 @@ if (batt > 10)  {
     }
 }    
 
+
 void SaveHistoty()
 {
 
@@ -271,6 +271,8 @@ void SaveHistoty()
 //    Serial.print(" temp1:");
 //    Serial.print(Out_Temp);
 //
+
+
 //
 //    Serial.print(" addr2:");
 //    Serial.print(adr + Addr_Temp_2);
@@ -374,9 +376,6 @@ void UpdateTemp()
 
 }
 
-
-
-
 void Read_Eprom()
 {
   int val = EEPROM.read(Addr_Auto_Temp);
@@ -387,6 +386,7 @@ void Read_Eprom()
   else                                 // Если с значением в ПЗУ что-то это не так или не запрограммированно, то ставим температуру по умолчанию
   {
     EEPROM.write(Addr_Auto_Temp, Auto_Temp);
+    EEPROM.commit();
   }
 
   val = EEPROM.read(Addr_Lcd_Tot);
@@ -401,9 +401,17 @@ void Read_Eprom()
 
 }
 
+void fillHistory() // Заполнить EEPROM временными данными
+{
 
+  for(int val=0; val<(23); val++) 
+  {
+    int adr = (1 + val) * 2 - 1;
 
-
-
-
-
+    EEPROM_int_write(adr + Addr_Temp_1, 23);
+    EEPROM_int_write(adr + Addr_Temp_2, 22);
+    EEPROM_int_write(adr + Addr_Temp_3, 21);
+    EEPROM_int_write(adr + Addr_Temp_4, 20);
+    EEPROM.commit();
+  }  
+}
