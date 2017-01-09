@@ -1,4 +1,3 @@
-// 27/10/2015
 void UpdateDisplay()
 {
   display.clearDisplay();
@@ -30,7 +29,7 @@ void UpdateDisplay()
       DrawHistPipe(Floor_1_Text, Addr_Temp_3, Floor_1_Temp);
       break;
     case 7:
-      DrawHistPipe(Floor_2_Text, Addr_Temp_4, Floor_2_Temp);
+      DrawHistLine(Floor_2_Text, Addr_Temp_4, Floor_2_Temp);
       break;
     case 8:
       DrawAbout();
@@ -119,8 +118,9 @@ void DrawSetting()
 
 
 
-void DrawHistPipe(String Str , byte Addr, int act_temp)
+void DrawHistPipe(char Str[11] , byte Addr, int act_temp)
 {
+
   MyPrint(Str, 1 * 6 - 6 + 3, 1 * 8 - 8 + 4, 1, 1);
   sprintf(temp_msg, "%02dC", act_temp);
   MyPrint(temp_msg, 7 * 6 - 6 + 3, 1 * 8 - 8 + 4, 1, 1);
@@ -141,29 +141,30 @@ void DrawHistPipe(String Str , byte Addr, int act_temp)
 
   sprintf(temp_msg, "MAX %02dC", tmpmax);
   MyPrint(temp_msg, 14 * 6 - 6, 1 * 8 - 8, 1, 1);
-//Serial.println(temp_msg);
+
   sprintf(temp_msg, "MIN %02dC", tmpmin);
   MyPrint(temp_msg, 14 * 6 - 6, 2 * 8 - 8, 1, 1);
-//Serial.println(temp_msg);
+
   display.drawRect(0, 16, 127, 37, WHITE);
   display.drawRect(0, 52, 127, 12, WHITE);
 
   for (int x = 0 ; x < 23; x++) {
     int y = map(EEPROM_int_read((1 + x) * 2 - 1 + Addr), tmpmin - 2, tmpmax, 1, 30);
     if (x > clock.hour) {
-      display.drawRect(7 + x * 5, 50 - y, 4, y, WHITE);
+       display.drawRect(7 + x * 5, 50 - y, 4, y, WHITE);
     }
     else {
-      display.fillRect(7 + x * 5, 50 - y, 4, y, WHITE);
+       display.fillRect(7 + x * 5, 50 - y, 4, y, WHITE);
     }
   }
-  int x = 9 + (clock.hour) * 5;
+  int x = 8 + (clock.hour) * 5;
+  display.drawLine(x, 16, x, 53, WHITE);
+
+  sprintf(temp_msg, "%02d" , clock.hour);
   display.drawLine(x, 16, x, 63, WHITE);
 }
 
 
-/*
-// не используеем вывод в линиях так как столбики красивее
 void DrawHistLine(String Str , byte Addr, int act_temp)
 {
   MyPrint(Str, 1 * 6 - 6 + 3, 1 * 8 - 8 + 4, 1, 1);
@@ -203,7 +204,6 @@ void DrawHistLine(String Str , byte Addr, int act_temp)
   int x = 4 + (clock.hour ) * 5;
   display.drawLine(x, 16, x, 63, WHITE);
 }
-*/
 
 
 
@@ -349,7 +349,7 @@ void DrawDash()
     display.setCursor(85, 52);
     display.print("4");
   }
-  if (isRelay05)
+  if (!isRelay05)
   {
     display.fillRect(97, 50, 12, 12, WHITE);
     display.setCursor(101, 52);
@@ -363,3 +363,6 @@ void DrawDash()
   }
 
 }
+
+
+
