@@ -14,13 +14,13 @@ void UpdateDisplay()
       DrawHome();
       break;
     case 2:
-      DrawSensor();
+      DrawBoiler();
       break;
     case 3:
-      DrawSetting();
+      DrawSensor();
       break;
     case 4:
-      DrawHistPipe(Main_Text, Addr_Temp_2, Main_Temp);
+      DrawSetting();
       break;
     case 5:
       DrawHistPipe(Out_Text, Addr_Temp_1, Out_Temp);
@@ -32,10 +32,10 @@ void UpdateDisplay()
       DrawHistLine(Floor_2_Text, Addr_Temp_4, Floor_2_Temp);
       break;
     case 8:
-      DrawAbout();
+      DrawHistPipe(Main_Text, Addr_Temp_2, Main_Temp);    
       break;
     case 9:
-
+      DrawAbout();
       break;
     case 10:
 
@@ -46,6 +46,7 @@ void UpdateDisplay()
   NextBattery();
   display.display();
 }
+
 
 
 void MyPrint(String Str, byte Col, byte Row, byte Size, byte Color)
@@ -61,7 +62,77 @@ void MyPrint(String Str, byte Col, byte Row, byte Size, byte Color)
   display.print(Str);
 }
 
+void DrawBoiler(){
+//      DrawTime();
+ int x = 0;
+ display.drawRect(66, 23, 29, 37, WHITE); // бойлер
+ display.drawRect(65, 22, 31, 39, WHITE); // бойлер
+ display.drawRect(72, 20, 17, 2, WHITE); // крыша
+ display.fillRect(106, 23, 13, 9, WHITE); // выход прямоугольник 
+ display.fillRect(106, 51, 13, 9, WHITE); // обратка прямоугольник 
+ display.drawRect(104, 21, 17, 13, WHITE); // выход рамка 
+ display.drawRect(104, 49, 17, 13, WHITE); // обратка рамка 
+ display.drawLine(110, 33, 110, 49, WHITE); // перемычка L обратка/выход
+ display.drawLine(114, 33, 114, 49, WHITE); // перемычка R обратка/выход
+ display.drawLine(71, 27, 104, 27, WHITE); // линия выход
+ display.drawLine(71, 55, 104, 55, WHITE); // линия вход
+ 
+ for (int val = 0; val < 4; val++)  {
+  display.drawLine(71, 27 + x, 71, 31 + x, WHITE); // Змеевик L
+  x = x + 8;
+ }
+  x = 0;
+ for (int val = 0; val < 6; val++)  {
+  display.drawLine(71, 31 + x, 89, 31 + x, WHITE); // Змеевик H
+  x = x + 4;
+ }
+ 
+  x = 0;
+ for (int val = 0; val < 3; val++)  {
+  display.drawLine(89, 31 + x, 89, 35 + x, WHITE); // Змеевик R
+  x = x + 8;
+ }
+  display.setTextColor(BLACK);
+  display.setCursor(107, 24);
+  display.print(76); // температура подачи
+  display.setCursor(107, 52);
+  display.print(64); // температура обратки
+  display.setTextColor(WHITE);
+  x = 0;
+ for (int val = 0; val < 10; val++)  {
+ display.fillRect(125, 3 + x, 3, 5, WHITE); // температурная шкала
+  x = x + 7;
+ }
+  display.drawTriangle(73, 64, 76, 61, 79, 64, WHITE); // пламя 1
+  display.drawTriangle(78, 64, 81, 61, 84, 64, WHITE); // пламя 2
+  display.drawTriangle(82, 64, 86, 61, 89, 64, WHITE); // пламя 3
 
+  display.fillTriangle(100, 30, 100, 24, 103, 27, WHITE); // стрелка выход
+  display.fillTriangle(96, 55, 99, 52, 99, 58, WHITE); // стрелка вход в котел
+
+
+  display.setTextSize(2);
+  display.setCursor(1, 1);
+  display.print(Main_Temp); // температура теплоностителя в левом верхнем углу
+  display.setTextSize(1);
+  display.drawCircle(28,3,3, WHITE);
+
+
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.setCursor(37,0);
+  display.println("c");
+  display.setTextSize(1);
+  
+  
+  
+  display.display();
+
+
+
+
+}
+  
 void DrawScreenSaver()
 {
   clock.getTime();
