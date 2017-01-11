@@ -41,13 +41,17 @@ void UpdateDisplay()
 
       break;
     default:
-      DrawScreenSaver();
+        EnergySaver();
+   //   DrawScreenSaver();
   }
   NextBattery();
   display.display();
 }
 
-
+void EnergySaver()
+{
+  display.clearDisplay(); 
+}
 
 void MyPrint(String Str, byte Col, byte Row, byte Size, byte Color)
 {
@@ -100,8 +104,8 @@ void DrawBoiler(){
   display.setTextColor(WHITE);
   x = 0;
  for (int val = 0; val < 10; val++)  {
- display.fillRect(125, 3 + x, 3, 5, WHITE); // температурная шкала
-  x = x + 7;
+ display.fillRect(123, 2 + x, 6, 5, WHITE); // температурная шкала
+  x = x + 8;
  }
   display.drawTriangle(73, 64, 76, 61, 79, 64, WHITE); // пламя 1
   display.drawTriangle(78, 64, 81, 61, 84, 64, WHITE); // пламя 2
@@ -114,19 +118,46 @@ void DrawBoiler(){
   display.setTextSize(2);
   display.setCursor(1, 1);
   display.print(Main_Temp); // температура теплоностителя в левом верхнем углу
-  display.setTextSize(1);
-  display.drawCircle(28,3,3, WHITE);
+  display.drawCircle(28,3,3, WHITE); // значек градуса
 
 
-  display.setTextSize(2);
   display.setTextColor(WHITE);
-  display.setCursor(37,0);
+  display.setCursor(34,0);
   display.println("c");
   display.setTextSize(1);
   
+ display.drawRect(48, 1, 38, 13, WHITE); // Рамка KW/h
+ display.fillRect(50, 3, 34, 9, WHITE); // Фон KW/h 
+ display.setTextColor(BLACK);
+ display.setCursor(52,4);
+ display.println("2KW/h");
+ 
+ display.drawRect(89, 1, 31, 13, WHITE); // Рамка PUMP  
+ display.fillRect(91, 3, 27, 9, WHITE); // Фон PUMP 
+ display.setCursor(93,4);
+ display.println("PUMP");
   
-  
-  display.display();
+
+ display.drawRect(1, 49, 50, 13, WHITE); // Рамка KW/h
+ display.fillRect(3, 51, 43, 9, WHITE); // Фон KW/h 
+ display.setCursor(5,52);
+ display.println("90%");
+
+ display.drawRect(27, 33, 17, 13, WHITE); // Рамка 80
+ display.fillRect(29, 35, 13, 9, WHITE); // Фон 80 
+ display.setCursor(30,36);
+ display.println(Alarm_Temp);
+ display.setTextColor(WHITE); 
+
+ display.drawRect(1, 33, 23, 13, WHITE); // Рамка PID
+ display.setCursor(4,36);
+ display.println("PID");
+ display.drawRect(1, 17, 60, 13, WHITE); // Рамка POWERFULL
+ display.setCursor(4,20);
+ display.println("POWERFULL");
+// display.setCursor(3,16);
+// display.println("MODE: WOOD");
+ display.display();
 
 
 
@@ -434,6 +465,3 @@ void DrawDash()
   }
 
 }
-
-
-
