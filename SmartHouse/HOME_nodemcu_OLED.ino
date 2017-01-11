@@ -66,7 +66,7 @@ char First_Number[] = "+79163770340"; // Номер на который в сл�
 char temp_msg[160];                   // Переменная , в нее пишется char для отсылки СМС (работает с sprintf();)
 
 byte num_Screen = 1;   // текущий экран
-byte max_Screen = 8;   // всего экранов
+byte max_Screen = 9;   // всего экранов
 byte batt = 0;         // Переменная хранит заряд батареи
 byte sgsm = 0;         // Переменная хранит уровень сигнала сети
 
@@ -109,6 +109,7 @@ unsigned long currentTime = 0;              // сюда просто сохра�
 unsigned long Next_Update_Draw = 0;         // Время апдейта экрана
 unsigned long Next_Update_Temp = 0;         // Время апдейта температуры
 unsigned long Next_Update_Screen_Saver = 0; // Время апдейта экрана
+unsigned long EnergySaveMode = 0;           // Время экономить жизнь экрана
 
 void(* resetFunc) (void) = 0;                    // declare reset function at address 0
 
@@ -120,7 +121,7 @@ void setup()
     encoderSetup();
   #endif //ENCODER_ON
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
-  display.display();                          // show splashscreen
+ // display.display();                          // show splashscreen
   display.clearDisplay();                     // clears the screen and buffer
 
   pinMode(btn_Right, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
@@ -153,16 +154,17 @@ void setup()
   UpdateTemp();
   SendStatus();
   //  fillHistory();
-  // clock.fillByYMD(2016,01,07);
-  // clock.fillByHMS(21,51,00);
+  // clock.fillByYMD(2016,01,10);
+  // clock.fillByHMS(22,32,00);
   // clock.setTime();
 //  EEPROM.write(addr_Auto_Temp, 24);
+  EnergySaveMode =  millis() + 15000; // время экономить жизнь OLED
 }
 
 void loop()
 {
   currentTime = millis();                       // считываем время, прошедшее с момента запуска программы
-
+  
   if (gprsSerial.available()) {                 // Если с порта модема идет передача
     char currSymb = gprsSerial.read();         //  читаем символ из порта модема
     //Serial.println(currSymb);
@@ -186,10 +188,17 @@ void loop()
   //  Check_GSM();
   }
 
-  if (currentTime > Next_Update_Screen_Saver) {    // время включать скринсейвер на экране
+  if (currentTime > Next_Update_Screen_Saver && currentTime < EnergySaveMode) {    // время включать скринсейвер на экране
     num_Screen = 0; 
     Next_Update_Screen_Saver =  millis() + 60000;  // отсчитываем по 60 секунд
   }
+  
+  if (currentTime > EnergySaveMode) {    // время включать скринсейвер на экране
+    num_Screen = 10;
+    EnergySaver();
+    //EnergySaveMode =  millis() + 45000; // время экономить жизнь OLED
+  }
+  
 } // END LOOP
 
 
@@ -238,6 +247,7 @@ void ReadButton()
         num_Screen = 1;
       }
       Next_Update_Screen_Saver =  millis() + 30000; // время для включения скринсейвера
+      EnergySaveMode =  millis() + 45000; // время экономить жизнь OLED
       Beep(500, 20);
     }
 }
