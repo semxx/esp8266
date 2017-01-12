@@ -9,8 +9,8 @@
 
 
 #define OLED_RESET LED_BUILTIN        // просто заглушка, oled на i2c работает без подключения этого контакта
-#define Power_GSM_PIN  D5        //GSM Shield при использовании GSM шилда который садиться прямо на мегу 
-#define Reset_GSM_PIN           //GSM Shield при использовании GSM шилда который садиться прямо на мегу
+#define Power_GSM_PIN  D5        //GSM Shield при использовании GSM шилда
+#define Reset_GSM_PIN           //GSM Shield при использовании GSM шилда
  
 // i2c для олед дисплея 128 X 64  и часов dip-ds1307
 //#define SDA             D4     // SDA
@@ -117,13 +117,10 @@ void setup()
 {
   Beep(780, 50);
   Last_Tel_Number=First_Number;
-  #ifdef ENCODER_ON
-    encoderSetup();
-  #endif //ENCODER_ON
+  Wire.begin(14,12);
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
  // display.display();                          // show splashscreen
   display.clearDisplay();                     // clears the screen and buffer
-
   pinMode(btn_Right, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
   pinMode(Power_GSM_PIN, OUTPUT);
   pinMode(Relay_1, OUTPUT);
@@ -139,26 +136,26 @@ void setup()
   digitalWrite(Relay_4, LOW);
   digitalWrite(Relay_5, LOW);
   digitalWrite(Relay_6, LOW);
-
   EEPROM.begin(512);
-
   Serial.begin(9600);
+  delay(10);
   gprsSerial.begin(9600);
   clock.begin();
-  sensorsDS18B20.begin();
   Read_Eprom();
-
-  Check_GSM();
-
+  sensorsDS18B20.begin();
   sensorsDS18B20.requestTemperatures();
   UpdateTemp();
-  SendStatus();
+  #ifdef ENCODER_ON
+  encoderSetup();
+  #endif
+  //  Check_GSM();
+  //  SendStatus();
   //  fillHistory();
   // clock.fillByYMD(2016,01,10);
   // clock.fillByHMS(22,32,00);
   // clock.setTime();
-//  EEPROM.write(addr_Auto_Temp, 24);
-  EnergySaveMode =  millis() + 15000; // время экономить жизнь OLED
+  // EEPROM.write(addr_Auto_Temp, 24);
+  EnergySaveMode =  millis() + 15000; // самое время экономить жизнь OLED
 }
 
 void loop()
@@ -172,7 +169,7 @@ void loop()
       currStr += String(currSymb);             // не конец строки добавляем в строку символ
     }
     else {                                      // конец строки начинаем ее разбор
-      Parse_Income_String();
+//      Parse_Income_String();
     }
   }
   
@@ -380,7 +377,7 @@ void UpdateTemp()
     isRelay02 = false;
     isAutoHeating = false;
     sprintf(temp_msg, "out=%dC,main=%dC,floor_1=%dC,floor_2=%dC, time: %d:%d", Out_Temp, Main_Temp, Floor_1_Temp, Floor_2_Temp, clock.hour, clock.minute);
-    SendTextMessage(Last_Tel_Number, F("ALARM TEMP. Floor REALAY OFF"), temp_msg);
+//    SendTextMessage(Last_Tel_Number, F("ALARM TEMP. Floor REALAY OFF"), temp_msg);
   }
 
 
