@@ -130,7 +130,7 @@ void DrawBoiler(){
  display.fillRect(50, 3, 34, 9, WHITE); // Фон KW/h 
  display.setTextColor(BLACK);
  display.setCursor(52,4);
- display.println("2KW/h");
+ display.println("4KW/h");
  
  display.drawRect(89, 1, 31, 13, WHITE); // Рамка PUMP  
  display.fillRect(91, 3, 27, 9, WHITE); // Фон PUMP 
@@ -141,7 +141,7 @@ void DrawBoiler(){
  display.drawRect(1, 49, 50, 13, WHITE); // Рамка KW/h
  display.fillRect(3, 51, 43, 9, WHITE); // Фон KW/h 
  display.setCursor(5,52);
- display.println("90%");
+ display.println(encoderValue);
 
  display.drawRect(27, 33, 17, 13, WHITE); // Рамка 80
  display.fillRect(29, 35, 13, 9, WHITE); // Фон 80 
