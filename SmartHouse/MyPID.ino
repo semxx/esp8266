@@ -1,3 +1,12 @@
+
+
+
+// http://bigbarrel.ru/arduino_pid/ ЧИТАТЬ ОБЯЗАТЕЛЬНО
+
+
+
+
+
 /********************************************************
  * PID Adaptive Tuning Example
  * One of the benefits of the PID library is that you can
