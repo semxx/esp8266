@@ -1,4 +1,8 @@
 
+#define BLYNK_PRINT Serial    // Comment this out to disable prints and save space
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+
 #include <OneWire.h>            //  Для DS18S20, DS18B20, DS1822 
 #include <DallasTemperature.h>  //  Для DS18S20, DS18B20, DS1822 
 #include <EEPROM.h>
@@ -6,23 +10,24 @@
 #include "DS1307.h"             //  Для  DS1307
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>   // русификация шрифта  http://focuswitharduino.blogspot.ru/2015/03/lcd-nokia-5110.html
-
+#include <Servo.h> 
+#include <Shift595.h>
 
 #define OLED_RESET LED_BUILTIN        // просто заглушка, oled на i2c работает без подключения этого контакта
-#define Power_GSM_PIN  D5        //GSM Shield при использовании GSM шилда
+#define Power_GSM_PIN  D9        //GSM Shield при использовании GSM шилда
 #define Reset_GSM_PIN           //GSM Shield при использовании GSM шилда
  
 // i2c для олед дисплея 128 X 64  и часов dip-ds1307
 //#define SDA             D4     // SDA
 //#define SCL             D3     // SCL
 
-#define Relay_1        D5        // Реле 1 40A    привязан к датчику  Therm_1
-#define Relay_2        D5        // Реле 2 40A   
-#define Relay_3        D5        // Реле 3 10A    
-#define Relay_4        D5        // Реле 4 10A  
-#define Relay_5        D5        // Реле 5 10A  
-#define Relay_6        D5        // Реле 6 10A   
-#define Speaker        3        // Динамик 
+#define Relay_1        D9        // Реле 1 40A    привязан к датчику  Therm_1
+#define Relay_2        D9        // Реле 2 40A   
+#define Relay_3        D9        // Реле 3 10A    
+#define Relay_4        D9        // Реле 4 10A  
+#define Relay_5        D9        // Реле 5 10A  
+#define Relay_6        D9        // Реле 6 10A   
+#define Speaker        D9        // Динамик 
 #define ONE_WIRE_BUS   D7       // Линия датчиков DS18B20
 #define btn_Right      D0         // Кнопа смены статусных экранов 
 //#define ENCODER_ON                              // Включить поддержку энкодера
@@ -46,6 +51,15 @@ Adafruit_SSD1306 display(OLED_RESET);
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensorsDS18B20(&oneWire);
 HardwareSerial & gprsSerial = Serial1;
+Servo myservo;  // create servo object to control a servo 
+
+char auth[] = "4921ca8db3bc4cf6a84613ad405d9094";
+
+// Your WiFi credentials.
+// Set password to "" for open networks.
+char ssid[] = "Xiaomi_2G";
+char pass[] = "panatorium";
+
 
 boolean isAutoHeating = true;     // Переменная принимает значение True, если включили автоподдержание температуры
 boolean isStringMessage = false;   // Переменная принимает значение True, если текущая строка является сообщением
@@ -113,13 +127,35 @@ unsigned long EnergySaveMode = 0;           // Время экономить ж�
 
 void(* resetFunc) (void) = 0;                    // declare reset function at address 0
 
+/////////////////// ЭНКОДЕР//////////////////
+long lastencoderValue = 0;
+int lastEncoded = 0;
+int encoderValue = 0;
+int lastMSB = 0;
+int lastLSB = 0;
+#define R D1
+#define L D2
+/////////////////////////////////////////////
+
+//Пин подключен к ST_CP входу 74HC595
+int latchPin = 3; // Оранжевый 8
+//Пин подключен к SH_CP входу 74HC595
+int clockPin = 1; // Коричневый 12
+//Пин подключен к DS входу 74HC595
+int dataPin = D8; // Белый 11
+#define   numOfRegisters    1 
+int del = 100;
+
+Shift595 Shifter(dataPin, latchPin, clockPin, numOfRegisters);
+
 void setup()
 {
   Beep(780, 50);
   Last_Tel_Number=First_Number;
   Wire.begin(14,12);
+  delay(5);
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
- // display.display();                          // show splashscreen
+  display.display();                          // show splashscreen
   display.clearDisplay();                     // clears the screen and buffer
   pinMode(btn_Right, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
   pinMode(Power_GSM_PIN, OUTPUT);
@@ -137,7 +173,7 @@ void setup()
   digitalWrite(Relay_5, LOW);
   digitalWrite(Relay_6, LOW);
   EEPROM.begin(512);
-  Serial.begin(9600);
+//  Serial.begin(9600);
   delay(10);
   gprsSerial.begin(9600);
   clock.begin();
@@ -156,6 +192,71 @@ void setup()
   // clock.setTime();
   // EEPROM.write(addr_Auto_Temp, 24);
   EnergySaveMode =  millis() + 15000; // самое время экономить жизнь OLED
+
+  pinMode(R, INPUT_PULLUP); 
+  pinMode(L, INPUT_PULLUP);
+
+  digitalWrite(R, HIGH); //turn pullup resistor on
+  digitalWrite(L, HIGH); //turn pullup resistor on  
+
+  attachInterrupt(digitalPinToInterrupt(R), handleInterrupt, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(L), handleInterrupt, CHANGE);
+  myservo.attach(0);
+ Shifter.setRegisterPin(1, HIGH);
+ Shifter.setRegisterPin(2, HIGH);
+ Shifter.setRegisterPin(3, HIGH);
+ Shifter.setRegisterPin(4, HIGH);
+//  Blynk.begin(auth, ssid, pass);
+}
+
+void setShift(){
+ //  for(int i=0; i <= 4; i++){
+   Shifter.setRegisterPin(1, HIGH);
+  // delay(del);
+ //  Shifter.setRegisterPin((i-1), LOW);
+   delay(del);
+ //  if (i == 4){
+ //   for(int i=4; i > 0; i--){
+   Shifter.setRegisterPin(1, LOW);
+   delay(del);
+//   Shifter.setRegisterPin((i+1), LOW);
+ //  delay(del); 
+ //  }
+ // }
+// }
+}  
+
+void handleInterrupt() {
+  int MSB = digitalRead(R); //MSB = most significant bit
+  int LSB = digitalRead(L); //LSB = least significant bit
+
+  int encoded = (MSB << 1) |LSB; //converting the 2 pin value to single number
+  int sum  = (lastEncoded << 2) | encoded; //adding it to the previous encoded value
+
+  if(sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) encoderValue ++;
+  if(sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) encoderValue --;
+
+  lastEncoded = encoded; //store this value for next time
+ //   Serial.print("Encoder: ");
+ //   Serial.println(encoderValue);
+  Next_Update_Screen_Saver =  millis() + 60000;    
+
+    if (encoded > 1  ) {
+        Shifter.setRegisterPin(1, LOW);
+        }
+      //  else {Shifter.setRegisterPin(1, HIGH);}
+    if (encoded > 20  ) {
+        Shifter.setRegisterPin(2, LOW);
+        }
+      //  else {Shifter.setRegisterPin(2, HIGH);}
+    if (encoded > 30  ) {
+        Shifter.setRegisterPin(3, LOW);
+        }
+       // else {Shifter.setRegisterPin(3, HIGH);}
+    if (encoded > 40  ) {
+        Shifter.setRegisterPin(4, LOW);
+        }
+       // else {Shifter.setRegisterPin(4, HIGH);}
 }
 
 void loop()
@@ -176,7 +277,9 @@ void loop()
   if (currentTime > Next_Update_Draw) {          // время перерисовать экран
     ReadButton();
     UpdateDisplay();
-    Next_Update_Draw =  millis() + 100;  // отсчитываем по 0,2 секунды
+    myservo.write(encoderValue);
+   // delay(15);
+    Next_Update_Draw =  millis() + 200;  // отсчитываем по 0,2 секунды
   }
 
   if (currentTime > Next_Update_Temp)  {         // время обновить температуру
@@ -195,7 +298,7 @@ void loop()
     EnergySaver();
     //EnergySaveMode =  millis() + 45000; // время экономить жизнь OLED
   }
-  
+//Blynk.run();
 } // END LOOP
 
 
@@ -422,3 +525,14 @@ void fillHistory() // Заполнить EEPROM временными данны�
     EEPROM.commit();
   }  
 }
+BLYNK_WRITE(1)
+{
+  int a = param.asInt();
+  if (a == 0)
+  {
+    Shifter.setRegisterPin(1, HIGH);
+  } else
+    {
+    Shifter.setRegisterPin(1, LOW);
+    }
+ }
