@@ -104,7 +104,7 @@ void DrawBoiler(){
   display.setTextColor(WHITE);
   x = 0;
  for (int val = 0; val < 10; val++)  {
- display.fillRect(123, 2 + x, 6, 5, WHITE); // температурная шкала
+ display.fillRect(123, 58 - x, 6, 5, WHITE); // температурная шкала
   x = x + 8;
  }
   display.drawTriangle(73, 64, 76, 61, 79, 64, WHITE); // пламя 1
