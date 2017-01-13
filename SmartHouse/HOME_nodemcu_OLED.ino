@@ -1,25 +1,24 @@
 
-#define BLYNK_PRINT Serial    // Comment this out to disable prints and save space
+//#define BLYNK_PRINT Serial     // Comment this out to disable prints and save space
 #include <ESP8266WiFi.h>
 #include <BlynkSimpleEsp8266.h>
-
-#include <OneWire.h>            //  Для DS18S20, DS18B20, DS1822 
-#include <DallasTemperature.h>  //  Для DS18S20, DS18B20, DS1822 
+#include <SimpleTimer.h>         // Essential for all Blynk Projects
+#include <OneWire.h>             //  Для DS18S20, DS18B20, DS1822 
+#include <DallasTemperature.h>   //  Для DS18S20, DS18B20, DS1822 
 #include <EEPROM.h>
-#include <Wire.h>               //  Для  DS1307
-#include "DS1307.h"             //  Для  DS1307
+#include <Wire.h>                //  Для  DS1307
+#include "DS1307.h"              //  Для  DS1307
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>   // русификация шрифта  http://focuswitharduino.blogspot.ru/2015/03/lcd-nokia-5110.html
+#include <Adafruit_SSD1306.h>    // русификация шрифта  http://focuswitharduino.blogspot.ru/2015/03/lcd-nokia-5110.html
 #include <Servo.h> 
 #include <Shift595.h>
 
-#define OLED_RESET LED_BUILTIN        // просто заглушка, oled на i2c работает без подключения этого контакта
+#define OLED_RESET LED_BUILTIN   // просто заглушка, oled на i2c работает без подключения этого контакта
 #define Power_GSM_PIN  D9        //GSM Shield при использовании GSM шилда
-#define Reset_GSM_PIN           //GSM Shield при использовании GSM шилда
- 
-// i2c для олед дисплея 128 X 64  и часов dip-ds1307
-//#define SDA             D4     // SDA
-//#define SCL             D3     // SCL
+#define Reset_GSM_PIN            //GSM Shield при использовании GSM шилда
+
+#define SDA            D5        // SDA   GPIO14
+#define SCL            D6        // SCL   GPIO12
 
 #define Relay_1        D9        // Реле 1 40A    привязан к датчику  Therm_1
 #define Relay_2        D9        // Реле 2 40A   
@@ -28,40 +27,27 @@
 #define Relay_5        D9        // Реле 5 10A  
 #define Relay_6        D9        // Реле 6 10A   
 #define Speaker        D9        // Динамик 
-#define ONE_WIRE_BUS   D7       // Линия датчиков DS18B20
-#define btn_Right      D0         // Кнопа смены статусных экранов 
-//#define ENCODER_ON                              // Включить поддержку энкодера
+#define ONE_WIRE_BUS   D7        // Линия датчиков DS18B20
+#define btn_Right      D8        // Кнопа смены статусных экранов 
+#define ENCODER_ON               // Включить поддержку энкодера
+#define R              D1
+#define L              D2
+#define numOfRegisters 1         // Указываем количество используемых сдвиговых регистров 74HC595
 
-#ifdef ENCODER_ON
-
-  #include "SimpleTimer.h"
-
-  uint8_t encoderDirection = 0;                 // Направление поворота энкодера
-  bool encoderFlagA = false;
-  bool encoderFlagB = false;
-  int encoderResetTimer = 0;
-  int encoderResetInterval = 2000;                     // Интервал сброса флагов
-  
-  SimpleTimer timer;
-  
-#endif //ENCODER_ON
-
-DS1307 clock;
 Adafruit_SSD1306 display(OLED_RESET);
+HardwareSerial & gprsSerial = Serial1;
+SimpleTimer timer;
+DS1307 clock;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensorsDS18B20(&oneWire);
-HardwareSerial & gprsSerial = Serial1;
 Servo myservo;  // create servo object to control a servo 
 
 char auth[] = "4921ca8db3bc4cf6a84613ad405d9094";
-
-// Your WiFi credentials.
-// Set password to "" for open networks.
 char ssid[] = "Xiaomi_2G";
 char pass[] = "panatorium";
 
 
-boolean isAutoHeating = true;     // Переменная принимает значение True, если включили автоподдержание температуры
+boolean isAutoHeating = true;      // Переменная принимает значение True, если включили автоподдержание температуры
 boolean isStringMessage = false;   // Переменная принимает значение True, если текущая строка является сообщением
 boolean isCalling = false;         // Переменная принимает значение True, если звонок
 boolean isRelay01 = false;         // Переменная принимает значение True, если реле включено
@@ -71,22 +57,20 @@ boolean isRelay04 = false;         // Переменная принимает з
 boolean isRelay05 = false;         // Переменная принимает значение True, если реле включено
 boolean isRelay06 = false;         // Переменная принимает значение True, если реле включено
 boolean isBlink = false;           // Переменная для мигания
+boolean Connected2Blynk = false;
 
 String currStr = "";               // переменная для чтения из сомпорта и счения смс и т.д.
 String Last_Tel_Number = "";       // переменная для номера от которого пришло смс или звонок
 String tmp_msg = "";               // Переменная , в нее пишется стринг для отсылки СМС (не работает с sprintf();)
-
-char First_Number[] = "+79163770340"; // Номер на который в случае чего будут идти СМС
-char temp_msg[160];                   // Переменная , в нее пишется char для отсылки СМС (работает с sprintf();)
+char   First_Number[] = "+79163770340"; // Номер на который в случае чего будут идти СМС
+char   temp_msg[160];                   // Переменная , в нее пишется char для отсылки СМС (работает с sprintf();)
 
 byte num_Screen = 1;   // текущий экран
 byte max_Screen = 9;   // всего экранов
 byte batt = 0;         // Переменная хранит заряд батареи
 byte sgsm = 0;         // Переменная хранит уровень сигнала сети
 
-
-
- #define dacha
+#define dacha
 
 #ifdef dacha
   byte Board_Therm[8] = {0x28,0xFF,0x1C,0xEE,0x87,0x16,0x03,0xF5};
@@ -95,18 +79,13 @@ byte sgsm = 0;         // Переменная хранит уровень си�
   byte Therm_2[8]     = {0x28,0xFF,0x8D,0xB5,0x87,0x16,0x03,0xC3};
 #endif
 
-int Out_Temp = 0;       // Температура на улице
-int Main_Temp = 0;      // Температура на плате
-int Floor_1_Temp = 0;   // Температура 1- й этаж
-int Floor_2_Temp = 0;   // Температура 2- й этаж
-
-char Main_Text[11]    = "Main";
-char Out_Text[11]     = "Outd";
-char Floor_1_Text[11] = "1_flr";
-char Floor_2_Text[11] = "2_flr";
-
-int Auto_Temp = 75;     // Дефолтовая автоматически поддерживаемая температура.
-int Alarm_Temp = 85;    // Критическия температура, при достежении шлем СМС и все отключаем
+int Auto_Temp = 75;       // Дефолтовая автоматически поддерживаемая температура.
+int Alarm_Temp = 85;      // Критическия температура, при достежении шлем СМС и все отключаем
+int Out_Temp = 0;         // Температура на улице
+int Main_Temp = 0;        // Температура на плате
+int Floor_1_Temp = 0;     // Температура 1- й этаж
+int Floor_2_Temp = 0;     // Температура 2- й этаж
+int SaveHistoryHour = 0;  // переменная для хранения значения последнего часа записи значения тепрературы, что бы записывать раз в час
 
 //  Ниже не значения, а адреса ячеек ПЗУ
 int Addr_Auto_Temp = 0;   // Адрес в ПЗУ для Auto_Temp
@@ -117,7 +96,10 @@ int Addr_Temp_3 =  98;    // +48
 int Addr_Temp_4 = 146;    // +48
 //
 
-int SaveHistoryHour = 0;  // переменная для хранения значения последнего часа записи значения тепрературы, что бы записывать раз в час
+char Main_Text[11]    = "Main";
+char Out_Text[11]     = "Outd";
+char Floor_1_Text[11] = "1_flr";
+char Floor_2_Text[11] = "2_flr";
 
 unsigned long currentTime = 0;              // сюда просто сохраняем текущее значение Mills
 unsigned long Next_Update_Draw = 0;         // Время апдейта экрана
@@ -125,34 +107,26 @@ unsigned long Next_Update_Temp = 0;         // Время апдейта тем�
 unsigned long Next_Update_Screen_Saver = 0; // Время апдейта экрана
 unsigned long EnergySaveMode = 0;           // Время экономить жизнь экрана
 
-void(* resetFunc) (void) = 0;                    // declare reset function at address 0
-
-/////////////////// ЭНКОДЕР//////////////////
-long lastencoderValue = 0;
-int lastEncoded = 0;
-int encoderValue = 0;
-int lastMSB = 0;
-int lastLSB = 0;
-#define R D1
-#define L D2
-/////////////////////////////////////////////
-
-//Пин подключен к ST_CP входу 74HC595
-int latchPin = 3; // Оранжевый 8
-//Пин подключен к SH_CP входу 74HC595
-int clockPin = 1; // Коричневый 12
-//Пин подключен к DS входу 74HC595
-int dataPin = D8; // Белый 11
-#define   numOfRegisters    1 
-int del = 100;
+// Подключаем сдвиговый регистр 74HC595
+int latchPin = 3;                           // Пин подключен к ST_CP входу 74HC595 (Оранжевый > 8)
+int clockPin = 1;                           // Пин подключен к SH_CP входу 74HC595  (Коричневый > 12)
+int dataPin = D0;                           // Пин подключен к DS входу 74HC595 (Белый > 11)
 
 Shift595 Shifter(dataPin, latchPin, clockPin, numOfRegisters);
 
+// Переменные для Encoder
+int  lastEncoded = 0;
+int  encoderValue = 0;
+int  lastMSB = 0;
+int  lastLSB = 0;
+long lastencoderValue = 0;
+
+void(* resetFunc) (void) = 0;               // declare reset function at address 0
+
 void setup()
 {
-  Beep(780, 50);
-  Last_Tel_Number=First_Number;
-  Wire.begin(14,12);
+//Beep(780, 50);
+  Wire.begin(SDA,SCL);
   delay(5);
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
   display.display();                          // show splashscreen
@@ -172,66 +146,83 @@ void setup()
   digitalWrite(Relay_4, LOW);
   digitalWrite(Relay_5, LOW);
   digitalWrite(Relay_6, LOW);
+  pinMode(R, INPUT_PULLUP); //  ENCODER RIGHT
+  pinMode(L, INPUT_PULLUP); //  ENCODER LEFT
+  digitalWrite(R, HIGH);    //  turn pullup resistor on
+  digitalWrite(L, HIGH);    //  turn pullup resistor on  
+  attachInterrupt(digitalPinToInterrupt(R), handleInterrupt, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(L), handleInterrupt, CHANGE);
+  Shifter.setRegisterPin(1, HIGH);
+  Shifter.setRegisterPin(2, HIGH);
+  Shifter.setRegisterPin(3, HIGH);
+  Shifter.setRegisterPin(4, HIGH);
   EEPROM.begin(512);
-//  Serial.begin(9600);
   delay(10);
   gprsSerial.begin(9600);
   clock.begin();
+  myservo.attach(0);
   Read_Eprom();
   sensorsDS18B20.begin();
   sensorsDS18B20.requestTemperatures();
   UpdateTemp();
-  #ifdef ENCODER_ON
-  encoderSetup();
-  #endif
-  //  Check_GSM();
-  //  SendStatus();
-  //  fillHistory();
+  // Serial.begin(9600);
+  // Check_GSM();
+  // SendStatus();
+  // fillHistory();
   // clock.fillByYMD(2016,01,10);
   // clock.fillByHMS(22,32,00);
   // clock.setTime();
   // EEPROM.write(addr_Auto_Temp, 24);
   EnergySaveMode =  millis() + 15000; // самое время экономить жизнь OLED
-
-  pinMode(R, INPUT_PULLUP); 
-  pinMode(L, INPUT_PULLUP);
-
-  digitalWrite(R, HIGH); //turn pullup resistor on
-  digitalWrite(L, HIGH); //turn pullup resistor on  
-
-  attachInterrupt(digitalPinToInterrupt(R), handleInterrupt, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(L), handleInterrupt, CHANGE);
-  myservo.attach(0);
- Shifter.setRegisterPin(1, HIGH);
- Shifter.setRegisterPin(2, HIGH);
- Shifter.setRegisterPin(3, HIGH);
- Shifter.setRegisterPin(4, HIGH);
-//  Blynk.begin(auth, ssid, pass);
+  Last_Tel_Number=First_Number;
+  MyWiFi();
 }
 
-void setShift(){
- //  for(int i=0; i <= 4; i++){
-   Shifter.setRegisterPin(1, HIGH);
-  // delay(del);
- //  Shifter.setRegisterPin((i-1), LOW);
-   delay(del);
- //  if (i == 4){
- //   for(int i=4; i > 0; i--){
-   Shifter.setRegisterPin(1, LOW);
-   delay(del);
-//   Shifter.setRegisterPin((i+1), LOW);
- //  delay(del); 
- //  }
- // }
-// }
-}  
+void MyWiFi(){
+  int mytimeout = millis() / 1000;
+  WiFi.begin(ssid, pass);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+   // Serial.print(".");
+    if((millis() / 1000) > mytimeout + 3){ // try for less than 4 seconds to connect to WiFi router
+      break;
+    }
+  }
+
+  if(WiFi.status() == WL_CONNECTED){  
+   // Serial.print("\nIP address: ");
+   // Serial.println(WiFi.localIP()); 
+  }
+  else{
+   // Serial.println("\nCheck Router ");    
+  }
+  Blynk.config(auth);
+  Connected2Blynk = Blynk.connect(1000);  // 1000 is a timeout of 3333 milliseconds 
+  mytimeout = millis() / 1000;
+  while (Blynk.connect(1000) == false) { 
+    if((millis() / 1000) > mytimeout + 3){ // try for less than 4 seconds
+      break;
+    }
+  }  
+}
+
+void CheckConnection(){
+  Connected2Blynk = Blynk.connected();
+  if(!Connected2Blynk){
+    //Serial.println("Not connected to Blynk server");
+    MyWiFi();  
+  }
+  else{
+    //Serial.println("Still connected to Blynk server");    
+  }
+}
 
 void handleInterrupt() {
-  int MSB = digitalRead(R); //MSB = most significant bit
-  int LSB = digitalRead(L); //LSB = least significant bit
+  int MSB = digitalRead(R);                     //MSB = most significant bit
+  int LSB = digitalRead(L);                    //LSB = least significant bit
 
-  int encoded = (MSB << 1) |LSB; //converting the 2 pin value to single number
-  int sum  = (lastEncoded << 2) | encoded; //adding it to the previous encoded value
+  int encoded = (MSB << 1) |LSB;             //converting the 2 pin value to single number
+  int sum  = (lastEncoded << 2) | encoded;  //adding it to the previous encoded value
 
   if(sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) encoderValue ++;
   if(sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) encoderValue --;
@@ -240,51 +231,50 @@ void handleInterrupt() {
  //   Serial.print("Encoder: ");
  //   Serial.println(encoderValue);
   Next_Update_Screen_Saver =  millis() + 60000;    
-
+//////////////////////////// DEBUG //////////////////////////////////
     if (encoded > 1  ) {
         Shifter.setRegisterPin(1, LOW);
         }
-      //  else {Shifter.setRegisterPin(1, HIGH);}
+        else {Shifter.setRegisterPin(1, HIGH);}
     if (encoded > 20  ) {
         Shifter.setRegisterPin(2, LOW);
         }
-      //  else {Shifter.setRegisterPin(2, HIGH);}
+        else {Shifter.setRegisterPin(2, HIGH);}
     if (encoded > 30  ) {
         Shifter.setRegisterPin(3, LOW);
         }
-       // else {Shifter.setRegisterPin(3, HIGH);}
+        else {Shifter.setRegisterPin(3, HIGH);}
     if (encoded > 40  ) {
         Shifter.setRegisterPin(4, LOW);
         }
-       // else {Shifter.setRegisterPin(4, HIGH);}
+        else {Shifter.setRegisterPin(4, HIGH);}
 }
 
 void loop()
 {
   currentTime = millis();                       // считываем время, прошедшее с момента запуска программы
-  
   if (gprsSerial.available()) {                 // Если с порта модема идет передача
-    char currSymb = gprsSerial.read();         //  читаем символ из порта модема
+    char currSymb = gprsSerial.read();          // читаем символ из порта модема
     //Serial.println(currSymb);
     if ('\n' != currSymb) {
-      currStr += String(currSymb);             // не конец строки добавляем в строку символ
+      currStr += String(currSymb);              // не конец строки добавляем в строку символ
     }
     else {                                      // конец строки начинаем ее разбор
 //      Parse_Income_String();
     }
   }
   
-  if (currentTime > Next_Update_Draw) {          // время перерисовать экран
+  if (currentTime > Next_Update_Draw) {         // время перерисовать экран
     ReadButton();
     UpdateDisplay();
     myservo.write(encoderValue);
    // delay(15);
-    Next_Update_Draw =  millis() + 200;  // отсчитываем по 0,2 секунды
+    Next_Update_Draw =  millis() + 200;         // отсчитываем по 0,2 секунды
   }
 
-  if (currentTime > Next_Update_Temp)  {         // время обновить температуру
+  if (currentTime > Next_Update_Temp)  {        // время обновить температуру
     UpdateTemp();
-    Next_Update_Temp =  millis() + 30000;           // отсчитываем по 30 секунд
+    Next_Update_Temp =  millis() + 30000;       // отсчитываем по 30 секунд
   //  Check_GSM();
   }
 
@@ -298,7 +288,10 @@ void loop()
     EnergySaver();
     //EnergySaveMode =  millis() + 45000; // время экономить жизнь OLED
   }
-//Blynk.run();
+  if(Connected2Blynk){
+    Blynk.run();  // only process Blyk.run() function if we are connected to Blynk server
+  }
+  timer.run();
 } // END LOOP
 
 
@@ -318,14 +311,10 @@ void Ring()
   Beep(626, 150);
 }
 
-
 // чтение из ПЗУ
 int EEPROM_int_read(int addr) {
  int num = EEPROM.read(addr);
- // byte raw[2];
- // for (byte i = 0; i < 2; i++) raw[i] = EEPROM.read(addr + i);
- // int &num = (int&)raw;
-  return num;
+ return num;
 }
 
 // запись в ПЗУ
@@ -363,7 +352,6 @@ if (batt > 10)  {
     }
 }    
 
-
 void SaveHistoty()
 {
 
@@ -381,21 +369,16 @@ void SaveHistoty()
 //    Serial.print(" temp1:");
 //    Serial.print(Out_Temp);
 //
-
-
-//
 //    Serial.print(" addr2:");
 //    Serial.print(adr + Addr_Temp_2);
 //    Serial.print(" temp2:");
 //    Serial.print(Main_Temp);
 //
-//   
 //    Serial.print(" addr3:");
 //    Serial.print(adr + Addr_Temp_3);
 //    Serial.print(" temp3:");
 //    Serial.print(Floor_1_Temp);
 //
-//    
 //    Serial.print(" addr4:");
 //    Serial.print(adr + Addr_Temp_4);
 //    Serial.print(" temp4:");
@@ -405,8 +388,6 @@ void SaveHistoty()
   }
 
 }
-
-
 
 void UpdateTemp()
 {
@@ -432,7 +413,7 @@ void UpdateTemp()
     Out_Temp = -88;
   }
   SaveHistoty();
-
+/*
   Serial.print("id1:");
   Serial.println(Out_Temp);
   Serial.print("id2:");
@@ -441,7 +422,7 @@ void UpdateTemp()
   Serial.println(Floor_1_Temp);
   Serial.print("id3:");
   Serial.println(Floor_2_Temp);
-
+*/
   if (isAutoHeating)                   // Если Включено автоподдержание то реагируем
   {
     // 1-й этаж
@@ -469,8 +450,6 @@ void UpdateTemp()
     }
 
   }
-
-
 
   if (Floor_1_Temp > Alarm_Temp  || Floor_2_Temp > Alarm_Temp  || Main_Temp > (Alarm_Temp * 2) ) // Если вдруг температура выше допустимой вырубаем все, попутно контролируем температуру на плате
   {
@@ -513,7 +492,6 @@ void Read_Eprom()
 
 void fillHistory() // Заполнить EEPROM временными данными
 {
-
   for(int val=0; val<(23); val++) 
   {
     int adr = (1 + val) * 2 - 1;
