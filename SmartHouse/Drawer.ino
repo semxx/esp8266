@@ -98,9 +98,9 @@ void DrawBoiler(){
  }
   display.setTextColor(BLACK);
   display.setCursor(107, 24);
-  display.print(76); // температура подачи
+  display.print(Floor_1_Temp); // температура подачи
   display.setCursor(107, 52);
-  display.print(64); // температура обратки
+  display.print(Floor_2_Temp); // температура обратки
   display.setTextColor(WHITE);
   x = 0;
  for (int val = 0; val < 10; val++)  {
@@ -117,7 +117,7 @@ void DrawBoiler(){
 
   display.setTextSize(2);
   display.setCursor(1, 1);
-  display.print(Main_Temp); // температура теплоностителя в левом верхнем углу
+  display.print(Floor_1_Temp); // температура теплоностителя в левом верхнем углу
   display.drawCircle(28,3,3, WHITE); // значек градуса
 
 
