@@ -26,7 +26,7 @@
 #define Relay_4        D9        // Реле 4 10A  
 #define Relay_5        D9        // Реле 5 10A  
 #define Relay_6        D9        // Реле 6 10A   
-#define Speaker        D9        // Динамик 
+#define Speaker        D4        // Динамик 
 #define ONE_WIRE_BUS   D7        // Линия датчиков DS18B20
 #define btn_Right      D8        // Кнопа смены статусных экранов 
 #define ENCODER_ON               // Включить поддержку энкодера
@@ -72,11 +72,18 @@ byte sgsm = 0;         // Переменная хранит уровень си�
 
 #define dacha
 
-#ifdef dacha
+#ifdef test
   byte Board_Therm[8] = {0x28,0xFF,0x1C,0xEE,0x87,0x16,0x03,0xF5};
   byte Out_Therm[8]   = {0x28,0xFF,0xA2,0xB5,0x90,0x16,0x04,0xE7};
   byte Therm_1[8]     = {0x28,0xFF,0x91,0xB0,0x87,0x16,0x03,0x1F};
   byte Therm_2[8]     = {0x28,0xFF,0x8D,0xB5,0x87,0x16,0x03,0xC3};
+#endif
+
+#ifdef dacha
+  byte Board_Therm[8] = {0x28,0xFF,0x1C,0xEE,0x87,0x16,0x03,0xF5};   // 
+  byte Out_Therm[8]   = {0x28,0xFF,0xA2,0xB5,0x90,0x16,0x04,0xE7};   // 
+  byte Therm_1[8]     = {0x28,0xFF,0x83,0x8F,0x00,0x15,0x02,0x21};    // INPUT
+  byte Therm_2[8]     = {0x28,0xFF,0x0B,0x0A,0x62,0x15,0x01,0x84};   // OUTPUT
 #endif
 
 int Auto_Temp = 75;       // Дефолтовая автоматически поддерживаемая температура.
@@ -139,6 +146,8 @@ void setup()
   pinMode(Relay_4, OUTPUT);
   pinMode(Relay_5, OUTPUT);
   pinMode(Relay_6, OUTPUT);
+  pinMode(Speaker, OUTPUT); //Set buzzerPin as output
+  digitalWrite(Speaker, HIGH);
   digitalWrite(Power_GSM_PIN, LOW);
   digitalWrite(Relay_1, LOW);
   digitalWrite(Relay_2, LOW);
@@ -231,23 +240,6 @@ void handleInterrupt() {
  //   Serial.print("Encoder: ");
  //   Serial.println(encoderValue);
   Next_Update_Screen_Saver =  millis() + 60000;    
-//////////////////////////// DEBUG //////////////////////////////////
-    if (encoded > 1  ) {
-        Shifter.setRegisterPin(1, LOW);
-        }
-        else {Shifter.setRegisterPin(1, HIGH);}
-    if (encoded > 20  ) {
-        Shifter.setRegisterPin(2, LOW);
-        }
-        else {Shifter.setRegisterPin(2, HIGH);}
-    if (encoded > 30  ) {
-        Shifter.setRegisterPin(3, LOW);
-        }
-        else {Shifter.setRegisterPin(3, HIGH);}
-    if (encoded > 40  ) {
-        Shifter.setRegisterPin(4, LOW);
-        }
-        else {Shifter.setRegisterPin(4, HIGH);}
 }
 
 void loop()
@@ -269,10 +261,13 @@ void loop()
     UpdateDisplay();
     myservo.write(encoderValue);
    // delay(15);
-    Next_Update_Draw =  millis() + 200;         // отсчитываем по 0,2 секунды
+    Next_Update_Draw =  millis() + 100;         // отсчитываем по 0,2 секунды
   }
 
   if (currentTime > Next_Update_Temp)  {        // время обновить температуру
+    Blynk.virtualWrite(V5, encoderValue );
+    Blynk.virtualWrite(V6, Floor_1_Temp);
+    Blynk.virtualWrite(V7, Floor_2_Temp);
     UpdateTemp();
     Next_Update_Temp =  millis() + 30000;       // отсчитываем по 30 секунд
   //  Check_GSM();
@@ -291,9 +286,25 @@ void loop()
   if(Connected2Blynk){
     Blynk.run();  // only process Blyk.run() function if we are connected to Blynk server
   }
+  if (Floor_1_Temp > 79) { 
+      do {
+          Buzzer(100); //Beep every 500 milliseconds
+          delay(150);
+         }
+    
+    while (Floor_1_Temp > 79);
+  }
+
   timer.run();
 } // END LOOP
 
+void Buzzer(unsigned char delayms) 
+{ 
+  analogWrite(Speaker, 1024); //Setting pin to high
+  delay(delayms); //Delaying
+  analogWrite(Speaker ,0); //Setting pin to LOW
+  delay(delayms); //Delaying
+}
 
 void Beep(word frq, word dur)
 {
@@ -328,7 +339,7 @@ EEPROM.commit();
 void ReadButton()
 {
  int sensorVal = digitalRead(btn_Right);
-    if (sensorVal == LOW) {                     // переключение информационных экранов
+    if (sensorVal == HIGH) {                     // переключение информационных экранов
       if (num_Screen < max_Screen) {
         num_Screen++;
       }
@@ -512,5 +523,38 @@ BLYNK_WRITE(1)
   } else
     {
     Shifter.setRegisterPin(1, LOW);
+    }
+ }
+ BLYNK_WRITE(2)
+{
+  int a = param.asInt();
+  if (a == 0)
+  {
+    Shifter.setRegisterPin(2, HIGH);
+  } else
+    {
+    Shifter.setRegisterPin(2, LOW);
+    }
+ }
+  BLYNK_WRITE(3)
+{
+  int a = param.asInt();
+  if (a == 0)
+  {
+    Shifter.setRegisterPin(3, HIGH);
+  } else
+    {
+    Shifter.setRegisterPin(3, LOW);
+    }
+ }
+   BLYNK_WRITE(4)
+{
+  int a = param.asInt();
+  if (a == 0)
+  {
+    Shifter.setRegisterPin(4, HIGH);
+  } else
+    {
+    Shifter.setRegisterPin(4, LOW);
     }
  }
