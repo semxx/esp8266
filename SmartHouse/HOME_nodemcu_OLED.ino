@@ -26,7 +26,7 @@
 #define Relay_4        D9        // Реле 4 10A  
 #define Relay_5        D9        // Реле 5 10A  
 #define Relay_6        D9        // Реле 6 10A   
-#define Speaker        D4        // Динамик 
+#define Speaker        A0        // Динамик 
 #define ONE_WIRE_BUS   D7        // Линия датчиков DS18B20
 #define btn_Right      D8        // Кнопа смены статусных экранов 
 #define ENCODER_ON               // Включить поддержку энкодера
@@ -59,6 +59,7 @@ boolean isRelay06 = false;         // Переменная принимает з
 boolean isBlink = false;           // Переменная для мигания
 boolean Connected2Blynk = false;
 
+String ipString =          "none";
 String currStr = "";               // переменная для чтения из сомпорта и счения смс и т.д.
 String Last_Tel_Number = "";       // переменная для номера от которого пришло смс или звонок
 String tmp_msg = "";               // Переменная , в нее пишется стринг для отсылки СМС (не работает с sprintf();)
@@ -187,6 +188,13 @@ void setup()
   MyWiFi();
 }
 
+String GetIpString (IPAddress ip) {
+  unsigned long start_time = millis();
+  String ipStr = String(ip[0]) + '.' + String(ip[1]) + '.' + String(ip[2]) + '.' + String(ip[3]);
+  unsigned long load_time = millis() - start_time;
+  return ipStr;
+}
+
 void MyWiFi(){
   int mytimeout = millis() / 1000;
   WiFi.begin(ssid, pass);
@@ -199,11 +207,22 @@ void MyWiFi(){
   }
 
   if(WiFi.status() == WL_CONNECTED){  
+   IPAddress espIP;
+   ipString = GetIpString(espIP);
+ //  display.clearDisplay();
+ //int mytimeout = millis() / 1000;
+  MyPrint(F("WiFi"), 2 * 6 - 6, 1 * 8 - 8, 2, 1);
+  MyPrint(F("connected"), 1 * 6 - 6, 4 * 8 - 8, 2, 1);
+  MyPrint(ipString, 1 * 6 - 6, 6 * 8 - 8, 2, 1);
    // Serial.print("\nIP address: ");
    // Serial.println(WiFi.localIP()); 
+   //delay(3500);
   }
   else{
-   // Serial.println("\nCheck Router ");    
+  display.clearDisplay();  
+  MyPrint(F("WiFi"), 2 * 6 - 6, 1 * 8 - 8, 2, 1);
+  MyPrint(F("is not found"), 1 * 6 - 6, 4 * 8 - 8, 2, 1);    
+  delay(3000);
   }
   Blynk.config(auth);
   Connected2Blynk = Blynk.connect(1000);  // 1000 is a timeout of 3333 milliseconds 
@@ -269,6 +288,7 @@ void loop()
     Blynk.virtualWrite(V6, Floor_1_Temp);
     Blynk.virtualWrite(V7, Floor_2_Temp);
     UpdateTemp();
+  //  CheckConnection();
     Next_Update_Temp =  millis() + 30000;       // отсчитываем по 30 секунд
   //  Check_GSM();
   }
@@ -281,7 +301,7 @@ void loop()
   if (currentTime > EnergySaveMode) {    // время включать скринсейвер на экране
     num_Screen = 10;
     EnergySaver();
-    //EnergySaveMode =  millis() + 45000; // время экономить жизнь OLED
+    //EnergySaveMode =  millis() + 45000; // время экономить жизнь OLE
   }
   if(Connected2Blynk){
     Blynk.run();  // only process Blyk.run() function if we are connected to Blynk server
