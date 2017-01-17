@@ -1,4 +1,3 @@
-
 //#define BLYNK_PRINT Serial     // Comment this out to disable prints and save space
 #include <ESP8266WiFi.h>
 #include <BlynkSimpleEsp8266.h>
@@ -137,8 +136,8 @@ void setup()
   Wire.begin(SDA,SCL);
   delay(5);
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
-  display.display();                          // show splashscreen
-  delay(2000);
+  //display.display();                          // show splashscreen
+  delay(500);
   // Clear the buffer.
   display.clearDisplay();                    // clears the screen and buffer
   pinMode(btn_Right, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
@@ -177,7 +176,7 @@ void setup()
   sensorsDS18B20.begin();
   sensorsDS18B20.requestTemperatures();
   UpdateTemp();
-  // Serial.begin(115200);
+   Serial.begin(9600);
   // Check_GSM();
   // SendStatus();
   // fillHistory();
@@ -196,16 +195,18 @@ String GetIpString (IPAddress ip) {
 }
 
 void MyWiFi(){
+  display.clearDisplay(); 
   int mytimeout = millis() / 1000;
   int x = 0;
   WiFi.begin(ssid, pass);
+  delay(500);
   while (WiFi.status() != WL_CONNECTED) {
-    delay(200);
-    MyPrint(F("WiFi"),           1 * 6 - 6,  1 * 8 - 8, 2, 1);
-    MyPrint(F("connecting"),     1 * 6 - 6,  4 * 8 - 8, 2, 1);
-    MyPrint(F("."),          1 + x * 6 - 6,  6 * 8 - 8, 2, 1);
+    delay(100);
+    MyPrint(F("  WiFi"),         1 * 6 - 6,  1 * 8 - 8, 2, 1);
+    MyPrint(F("Connecting"),     1 * 6 - 6,  4 * 8 - 8, 2, 1);
+    MyPrint(F("_"),          1 + x * 6 - 6,  6 * 8 - 8, 2, 1);
     display.display();
-    if((millis() / 1000) > mytimeout + 3){ // try for less than 4 seconds to connect to WiFi router
+    if((millis() / 1000) > mytimeout + 4){ // try for less than 5 seconds to connect to WiFi router
       display.clearDisplay(); 
       break;
     }
@@ -217,22 +218,21 @@ void MyWiFi(){
       IPAddress espIP;
       espIP=WiFi.localIP();
       ipString = GetIpString(espIP);
-        MyPrint(F("WiFi"),       1 * 6 - 6, 1 * 8 - 8, 2, 1);
-        MyPrint(F("connected!"), 1 * 6 - 6, 4 * 8 - 8, 2, 1);
-        MyPrint(ipString,        1 * 6 - 6, 6 * 8 - 8, 1, 1);
+        MyPrint(F("  WiFi"),     1 * 6 - 6, 1 * 8 - 8, 2, 1);
+        MyPrint(F("Connected!"), 1 * 6 - 6, 4 * 8 - 8, 2, 1);
+        MyPrint(ipString,        1 * 6 - 6, 7 * 8 - 8, 1, 1);
         display.display();
         delay(2500);
     }   
   else {
         mytimeout = millis() / 1000;       
         do {
-            MyPrint(F("WiFi"),      1 * 6 - 6, 1 * 8 - 8, 2, 1);
+            MyPrint(F("  WiFi"),    1 * 6 - 6, 1 * 8 - 8, 2, 1);
             MyPrint(F("not found"), 1 * 6 - 1, 4 * 8 - 8, 2, 1); 
             display.display();
            }
-           while (((millis() / 1000) < mytimeout + 3)); 
-           
-//           break;
+           while (((millis() / 1000) > mytimeout + 1)); 
+
           } 
      
   Blynk.config(auth);
@@ -250,11 +250,11 @@ void MyWiFi(){
 void CheckConnection(){
   Connected2Blynk = Blynk.connected();
   if(!Connected2Blynk){
-    //Serial.println("Not connected to Blynk server");
+    Serial.println("Not connected to Blynk server");
     MyWiFi();  
   }
   else{
-    //Serial.println("Still connected to Blynk server");    
+    Serial.println("Still connected to Blynk server");    
   }
 }
 
@@ -301,7 +301,8 @@ void loop()
     Blynk.virtualWrite(V6, Floor_1_Temp);
     Blynk.virtualWrite(V7, Floor_2_Temp);
     UpdateTemp();
-  //  CheckConnection();
+    Serial.println(WIFI_getRSSIasQuality(WiFi.RSSI()));
+    //CheckConnection();
     Next_Update_Temp =  millis() + 30000;       // отсчитываем по 30 секунд
   //  Check_GSM();
   }
@@ -375,6 +376,8 @@ void ReadButton()
     if (sensorVal == HIGH) {                     // переключение информационных экранов
       if (num_Screen < max_Screen) {
         num_Screen++;
+          Buzzer(100); //Beep every 500 milliseconds
+          delay(150);
       }
       else  {
         num_Screen = 1;
