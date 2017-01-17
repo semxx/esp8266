@@ -334,10 +334,7 @@ void DrawBattery(word prc)
 }
 
 int WIFI_getRSSIasQuality(int RSSI) {
-//  char log[LOGSZ];
   unsigned long start_time = millis();
-  //addLog_P(LOG_LEVEL_DEBUG_MORE, "Func: WIFI_getRSSIasQuality Start");
-
   int quality = 0;
 
   if (RSSI <= -100) {
@@ -349,8 +346,6 @@ int WIFI_getRSSIasQuality(int RSSI) {
   }
 
   unsigned long load_time = millis() - start_time;
-  //snprintf_P(log, sizeof(log), PSTR("Func: WIFI_getRSSIasQuality load time: %d"), load_time);
-  //addLog(LOG_LEVEL_DEBUG_MORE, log);
   return quality;
 }
 
