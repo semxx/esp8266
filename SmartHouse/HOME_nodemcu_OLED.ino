@@ -59,7 +59,7 @@ boolean isRelay06 = false;         // Переменная принимает з
 boolean isBlink = false;           // Переменная для мигания
 boolean Connected2Blynk = false;
 
-String ipString =          "none";
+String ipString =        "";
 String currStr = "";               // переменная для чтения из сомпорта и счения смс и т.д.
 String Last_Tel_Number = "";       // переменная для номера от которого пришло смс или звонок
 String tmp_msg = "";               // Переменная , в нее пишется стринг для отсылки СМС (не работает с sprintf();)
@@ -138,7 +138,9 @@ void setup()
   delay(5);
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
   display.display();                          // show splashscreen
-  display.clearDisplay();                     // clears the screen and buffer
+  delay(2000);
+  // Clear the buffer.
+  display.clearDisplay();                    // clears the screen and buffer
   pinMode(btn_Right, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
   pinMode(Power_GSM_PIN, OUTPUT);
   pinMode(Relay_1, OUTPUT);
@@ -175,7 +177,7 @@ void setup()
   sensorsDS18B20.begin();
   sensorsDS18B20.requestTemperatures();
   UpdateTemp();
-  // Serial.begin(9600);
+  // Serial.begin(115200);
   // Check_GSM();
   // SendStatus();
   // fillHistory();
@@ -189,41 +191,50 @@ void setup()
 }
 
 String GetIpString (IPAddress ip) {
-  unsigned long start_time = millis();
   String ipStr = String(ip[0]) + '.' + String(ip[1]) + '.' + String(ip[2]) + '.' + String(ip[3]);
-  unsigned long load_time = millis() - start_time;
   return ipStr;
 }
 
 void MyWiFi(){
   int mytimeout = millis() / 1000;
+  int x = 0;
   WiFi.begin(ssid, pass);
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-   // Serial.print(".");
+    delay(200);
+    MyPrint(F("WiFi"),           1 * 6 - 6,  1 * 8 - 8, 2, 1);
+    MyPrint(F("connecting"),     1 * 6 - 6,  4 * 8 - 8, 2, 1);
+    MyPrint(F("."),          1 + x * 6 - 6,  6 * 8 - 8, 2, 1);
+    display.display();
     if((millis() / 1000) > mytimeout + 3){ // try for less than 4 seconds to connect to WiFi router
+      display.clearDisplay(); 
       break;
     }
+  x = x + 1;
   }
 
-  if(WiFi.status() == WL_CONNECTED){  
-   IPAddress espIP;
-   ipString = GetIpString(espIP);
- //  display.clearDisplay();
- //int mytimeout = millis() / 1000;
-  MyPrint(F("WiFi"), 2 * 6 - 6, 1 * 8 - 8, 2, 1);
-  MyPrint(F("connected"), 1 * 6 - 6, 4 * 8 - 8, 2, 1);
-  MyPrint(ipString, 1 * 6 - 6, 6 * 8 - 8, 2, 1);
-   // Serial.print("\nIP address: ");
-   // Serial.println(WiFi.localIP()); 
-   //delay(3500);
-  }
-  else{
-  display.clearDisplay();  
-  MyPrint(F("WiFi"), 2 * 6 - 6, 1 * 8 - 8, 2, 1);
-  MyPrint(F("is not found"), 1 * 6 - 6, 4 * 8 - 8, 2, 1);    
-  delay(3000);
-  }
+   if  (WiFi.status() == WL_CONNECTED) {
+      display.clearDisplay(); 
+      IPAddress espIP;
+      espIP=WiFi.localIP();
+      ipString = GetIpString(espIP);
+        MyPrint(F("WiFi"),       1 * 6 - 6, 1 * 8 - 8, 2, 1);
+        MyPrint(F("connected!"), 1 * 6 - 6, 4 * 8 - 8, 2, 1);
+        MyPrint(ipString,        1 * 6 - 6, 6 * 8 - 8, 1, 1);
+        display.display();
+        delay(2500);
+    }   
+  else {
+        mytimeout = millis() / 1000;       
+        do {
+            MyPrint(F("WiFi"),      1 * 6 - 6, 1 * 8 - 8, 2, 1);
+            MyPrint(F("not found"), 1 * 6 - 1, 4 * 8 - 8, 2, 1); 
+            display.display();
+           }
+           while (((millis() / 1000) < mytimeout + 3)); 
+           
+//           break;
+          } 
+     
   Blynk.config(auth);
   Connected2Blynk = Blynk.connect(1000);  // 1000 is a timeout of 3333 milliseconds 
   mytimeout = millis() / 1000;
@@ -231,8 +242,10 @@ void MyWiFi(){
     if((millis() / 1000) > mytimeout + 3){ // try for less than 4 seconds
       break;
     }
-  }  
+  }
+  display.clearDisplay(); 
 }
+
 
 void CheckConnection(){
   Connected2Blynk = Blynk.connected();
@@ -432,16 +445,16 @@ void UpdateTemp()
 
   // если датчик не подключен выдает -127 на экране не красиво, поставим -88
   if (Floor_1_Temp == -127) {
-    Floor_1_Temp = -88;
+    Floor_1_Temp = 00;
   }
   if (Floor_2_Temp == -127) {
-    Floor_2_Temp = -88;
+    Floor_2_Temp = 00;
   }
   if (Main_Temp == -127) {
-    Main_Temp = -88;
+    Main_Temp = 00;
   }
   if (Out_Temp == -127) {
-    Out_Temp = -88;
+    Out_Temp = 00;
   }
   SaveHistoty();
 /*
