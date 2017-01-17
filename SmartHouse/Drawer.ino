@@ -7,7 +7,8 @@ void UpdateDisplay()
       DrawScreenSaver();
       break;
     case 1:
-      DrawGSM(27); //DrawGSM(sgsm);
+      
+      DrawGSM(WIFI_getRSSIasQuality(WiFi.RSSI())); //DrawGSM(sgsm);
       DrawTime();
       DrawBattery(batt);
       DrawDash();
@@ -353,10 +354,12 @@ void DrawGSM(word signal)
 {
   display.drawLine(6, 2, 6, 13, WHITE);
   display.drawTriangle(1, 2, 11, 2, 6, 7, WHITE);
-  if (signal > 7)     display.fillRect(9, 12, 2, 2, WHITE);
-  if (signal > 13)    display.fillRect(12, 10, 2, 4, WHITE);
-  if (signal > 19)    display.fillRect(15, 6, 2, 8, WHITE);
-  if (signal > 25)    display.fillRect(18, 2, 2, 12, WHITE);
+  if  (WiFi.status() == WL_CONNECTED) {
+  if (signal > 40)    display.fillRect(9, 12, 2, 2, WHITE);
+  if (signal > 50)    display.fillRect(12, 10, 2, 4, WHITE);
+  if (signal > 70)    display.fillRect(15, 6, 2, 8, WHITE);
+  if (signal > 85)    display.fillRect(18, 2, 2, 12, WHITE);
+  }
 }
 
 
