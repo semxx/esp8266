@@ -7,8 +7,7 @@ void UpdateDisplay()
       DrawScreenSaver();
       break;
     case 1:
-      
-      DrawGSM(WIFI_getRSSIasQuality(WiFi.RSSI())); //DrawGSM(sgsm);
+      DrawGSM(27); //DrawGSM(sgsm);
       DrawTime();
       DrawBattery(batt);
       DrawDash();
@@ -65,6 +64,70 @@ void MyPrint(String Str, byte Col, byte Row, byte Size, byte Color)
   display.setTextSize(Size);
   display.setCursor(Col, Row);
   display.print(Str);
+}
+
+void DrawSetting()
+{
+
+if (oldEncoderValue != encoderValue) {
+      MenuItem = constrain(MenuItem, 0, 4);
+      inMenu = true;
+      if (encoderValue > oldEncoderValue) {
+//        MenuTimeoutTimer = 10; //таймер таймаута, секунд
+//        if (encoderR) {
+          MenuItem += 1;
+        }
+        else  {
+          MenuItem -= 1;
+        }
+        if ( MenuItem > 3 ) { // границы пунктов меню
+          MenuItem = 1;
+        } 
+        if ( MenuItem < 1 ) {
+          MenuItem = 3;
+        }
+        //MenuItem = constrain(MenuItem, 0, 8);
+
+oldEncoderValue = encoderValue;
+}
+
+if (inMenu) {
+
+  switch (MenuItem)
+  {
+    case 1:
+      display.drawRect(0, 0, 128, 16, WHITE);
+      MyPrint(F("Electric"), 3 * 6 - 6, 1 * 8 - 8, 2, 1);
+      isAutoHeating = true;
+      break;
+    case 2:
+      display.drawRect(0, 0, 128, 16, WHITE);
+      MyPrint(F("Wood mode"), 3 * 6 - 6, 1 * 8 - 8, 2, 1);
+      isAutoHeating = false;    
+      break;
+    case 3:
+      MyPrint(F("Saved.."), 1 * 6 - 6, 3 * 8 - 8, 3, 1);    
+      //delay (1000);
+      inMenu = false;
+      break;
+      default: break;
+  }  
+}
+
+else {
+      MyPrint(F("SETTINGS"), 2 * 6 - 6, 1 * 8 - 8, 2, 1);
+      sprintf(temp_msg, "Alarm Temp: %02dC", Alarm_Temp);
+      MyPrint(temp_msg, 2 * 6 - 6, 3 * 8 - 8, 1, 1);
+      sprintf(temp_msg, "Auto  Temp: %02dC", Auto_Temp);
+      MyPrint(temp_msg, 2 * 6 - 6, 4 * 8 - 8, 1, 1);
+      if (isAutoHeating)  {
+        MyPrint(F("Heat: ON"), 2 * 6 - 6, 5 * 8 - 8, 1, 1);
+      }
+      else  {
+        MyPrint(F("Heat: OFF"), 2 * 6 - 6, 5 * 8 - 8, 1, 1);
+      }
+      MyPrint("Numb: " + String(First_Number), 2 * 6 - 6, 7 * 8 - 8, 1, 1);
+    }
 }
 
 void DrawBoiler(){
@@ -200,27 +263,6 @@ void DrawSensor()
 }
 
 
-
-
-void DrawSetting()
-{
-  MyPrint(F("SETTINGS"), 2 * 6 - 6, 1 * 8 - 8, 2, 1);
-  sprintf(temp_msg, "Alarm Temp: %02dC", Alarm_Temp);
-  MyPrint(temp_msg, 2 * 6 - 6, 3 * 8 - 8, 1, 1);
-  sprintf(temp_msg, "Auto  Temp: %02dC", Auto_Temp);
-  MyPrint(temp_msg, 2 * 6 - 6, 4 * 8 - 8, 1, 1);
-  if (isAutoHeating)  {
-    MyPrint(F("Heat: ON"), 2 * 6 - 6, 5 * 8 - 8, 1, 1);
-  }
-  else  {
-    MyPrint(F("Heat: OFF"), 2 * 6 - 6, 5 * 8 - 8, 1, 1);
-  }
-  MyPrint("Numb: " + String(First_Number), 2 * 6 - 6, 7 * 8 - 8, 1, 1);
-}
-
-
-
-
 void DrawHistPipe(char Str[11] , byte Addr, int act_temp)
 {
 
@@ -354,12 +396,10 @@ void DrawGSM(word signal)
 {
   display.drawLine(6, 2, 6, 13, WHITE);
   display.drawTriangle(1, 2, 11, 2, 6, 7, WHITE);
-  if  (WiFi.status() == WL_CONNECTED) {
-  if (signal > 40)    display.fillRect(9, 12, 2, 2, WHITE);
-  if (signal > 50)    display.fillRect(12, 10, 2, 4, WHITE);
-  if (signal > 70)    display.fillRect(15, 6, 2, 8, WHITE);
-  if (signal > 85)    display.fillRect(18, 2, 2, 12, WHITE);
-  }
+  if (signal > 7)     display.fillRect(9, 12, 2, 2, WHITE);
+  if (signal > 13)    display.fillRect(12, 10, 2, 4, WHITE);
+  if (signal > 19)    display.fillRect(15, 6, 2, 8, WHITE);
+  if (signal > 25)    display.fillRect(18, 2, 2, 12, WHITE);
 }
 
 
