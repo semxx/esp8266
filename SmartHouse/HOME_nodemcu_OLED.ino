@@ -179,7 +179,7 @@ void setup()
   sensorsDS18B20.begin();
   sensorsDS18B20.requestTemperatures();
   UpdateTemp();
-   Serial.begin(9600);
+  Serial.begin(9600);
   // Check_GSM();
   // SendStatus();
   // fillHistory();
@@ -253,11 +253,11 @@ void MyWiFi(){
 void CheckConnection(){
   Connected2Blynk = Blynk.connected();
   if(!Connected2Blynk){
-    Serial.println("Not connected to Blynk server");
+    //Serial.println("Not connected to Blynk server");
     MyWiFi();  
   }
   else{
-    Serial.println("Still connected to Blynk server");    
+    //Serial.println("Still connected to Blynk server");    
   }
 }
 
@@ -275,6 +275,7 @@ void handleInterrupt() {
  //   Serial.print("Encoder: ");
  //   Serial.println(encoderValue);
   Next_Update_Screen_Saver =  millis() + 60000;    
+  EnergySaveMode =  millis() + 45000; // время экономить жизнь OLED
 }
 
 void loop()
@@ -304,10 +305,10 @@ void loop()
     Blynk.virtualWrite(V6, Floor_1_Temp);
     Blynk.virtualWrite(V7, Floor_2_Temp);
     UpdateTemp();
-    Serial.println(WIFI_getRSSIasQuality(WiFi.RSSI()));
-    //CheckConnection();
+    // Serial.println(WIFI_getRSSIasQuality(WiFi.RSSI()));
+    // CheckConnection();
     Next_Update_Temp =  millis() + 30000;       // отсчитываем по 30 секунд
-  //  Check_GSM();
+    // Check_GSM();
   }
 
   if (currentTime > Next_Update_Screen_Saver && currentTime < EnergySaveMode) {    // время включать скринсейвер на экране
