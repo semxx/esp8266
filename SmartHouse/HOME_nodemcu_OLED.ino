@@ -57,6 +57,7 @@ boolean isRelay05 = false;         // Переменная принимает з
 boolean isRelay06 = false;         // Переменная принимает значение True, если реле включено
 boolean isBlink = false;           // Переменная для мигания
 boolean Connected2Blynk = false;
+boolean inMenu = false;
 
 String ipString =        "";
 String currStr = "";               // переменная для чтения из сомпорта и счения смс и т.д.
@@ -93,6 +94,8 @@ int Main_Temp = 0;        // Температура на плате
 int Floor_1_Temp = 0;     // Температура 1- й этаж
 int Floor_2_Temp = 0;     // Температура 2- й этаж
 int SaveHistoryHour = 0;  // переменная для хранения значения последнего часа записи значения тепрературы, что бы записывать раз в час
+int MenuItem = 0;
+int oldEncoderValue  = 0;
 
 //  Ниже не значения, а адреса ячеек ПЗУ
 int Addr_Auto_Temp = 0;   // Адрес в ПЗУ для Auto_Temp
