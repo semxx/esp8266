@@ -7,7 +7,7 @@ void UpdateDisplay()
       DrawScreenSaver();
       break;
     case 1:
-      DrawGSM(WIFI_getRSSIasQuality(WiFi.RSSI())); //DrawGSM(sgsm);
+      DrawGSM(WIFI_getRSSIasQuality(WiFi.RSSI()));               //DrawGSM(sgsm);
       DrawTime();
       DrawBattery(batt);
       DrawDash();
@@ -17,22 +17,22 @@ void UpdateDisplay()
       DrawBoiler();
       break;
     case 3:
-      DrawSensor();
-      break;
-    case 4:
       DrawSetting();
       break;
+    case 4:
+      DrawSensor();
+      break;
     case 5:
-      DrawHistPipe(Out_Text, Addr_Temp_1, Out_Temp);
+      DrawHistPipe();
       break;
     case 6:
-      DrawHistPipe(Floor_1_Text, Addr_Temp_3, Floor_1_Temp);
+      DrawHistLine();
       break;
     case 7:
-      DrawHistLine(Floor_2_Text, Addr_Temp_4, Floor_2_Temp);
+     // DrawHistLine(Floor_2_Text, Addr_Temp_4, Floor_2_Temp);
       break;
     case 8:
-      DrawHistPipe(Main_Text, Addr_Temp_2, Main_Temp);    
+     // DrawHistPipe(Main_Text, Addr_Temp_2, Main_Temp);    
       break;
     case 9:
       DrawAbout();
@@ -181,8 +181,8 @@ void DrawBoiler(){
 
   display.setTextSize(2);
   display.setCursor(1, 1);
-  display.print(Floor_1_Temp); // температура теплоностителя в левом верхнем углу
-  display.drawCircle(28,3,3, WHITE); // значек градуса
+  display.print(Floor_1_Temp);        // температура теплоностителя в левом верхнем углу
+  display.drawCircle(28,3,3, WHITE);  // значек градуса
 
 
   display.setTextColor(WHITE);
@@ -263,9 +263,56 @@ void DrawSensor()
 }
 
 
-void DrawHistPipe(char Str[11] , byte Addr, int act_temp)
-{
 
+void DrawHistPipe()
+{
+String Str;
+byte Addr;
+int act_temp;  
+
+if (oldEncoderValue != encoderValue) {
+      MenuItem = constrain(MenuItem, 0, 5);
+      if (encoderValue > oldEncoderValue) {
+          MenuItem += 1;
+        }
+        else  {
+          MenuItem -= 1;
+        }
+        if ( MenuItem > 4 ) { // границы пунктов меню
+          MenuItem = 1;
+        } 
+        if ( MenuItem < 1 ) {
+          MenuItem = 4;
+        }
+oldEncoderValue = encoderValue;
+}
+  switch (MenuItem)
+  {
+    case 1:
+            Str = Out_Text;
+            Addr = Addr_Temp_1;
+            act_temp = Out_Temp;
+            break;
+    case 2:
+            Str = Floor_1_Text;
+            Addr = Addr_Temp_3;
+            act_temp = Floor_1_Temp;
+            break;
+    case 3:
+            Str = Floor_2_Text;
+            Addr = Addr_Temp_4;
+            act_temp = Floor_2_Temp;
+            break;
+    case 4:
+            Str = Main_Text;
+            Addr = Addr_Temp_2;
+            act_temp = Main_Temp;
+            break;
+      default: MenuItem = 1; 
+            break;
+
+  } 
+  
   MyPrint(Str, 1 * 6 - 6 + 3, 1 * 8 - 8 + 4, 1, 1);
   sprintf(temp_msg, "%02dC", act_temp);
   MyPrint(temp_msg, 7 * 6 - 6 + 3, 1 * 8 - 8 + 4, 1, 1);
@@ -310,8 +357,55 @@ void DrawHistPipe(char Str[11] , byte Addr, int act_temp)
 }
 
 
-void DrawHistLine(String Str , byte Addr, int act_temp)
+void DrawHistLine()
 {
+String Str;
+byte Addr;
+int act_temp;  
+
+if (oldEncoderValue != encoderValue) {
+      MenuItem = constrain(MenuItem, 0, 5);
+      if (encoderValue > oldEncoderValue) {
+          MenuItem += 1;
+        }
+        else  {
+          MenuItem -= 1;
+        }
+        if ( MenuItem > 4 ) { // границы пунктов меню
+          MenuItem = 1;
+        } 
+        if ( MenuItem < 1 ) {
+          MenuItem = 4;
+        }
+oldEncoderValue = encoderValue;
+}
+  switch (MenuItem)
+  {
+    case 1:
+            Str = Out_Text;
+            Addr = Addr_Temp_1;
+            act_temp = Out_Temp;
+            break;
+    case 2:
+            Str = Floor_1_Text;
+            Addr = Addr_Temp_3;
+            act_temp = Floor_1_Temp;
+            break;
+    case 3:
+            Str = Floor_2_Text;
+            Addr = Addr_Temp_4;
+            act_temp = Floor_2_Temp;
+            break;
+    case 4:
+            Str = Main_Text;
+            Addr = Addr_Temp_2;
+            act_temp = Main_Temp;
+            break;
+      default: MenuItem = 1;
+            break;
+
+  } 
+  
   MyPrint(Str, 1 * 6 - 6 + 3, 1 * 8 - 8 + 4, 1, 1);
   sprintf(temp_msg, "%02dC", act_temp);
   MyPrint(temp_msg, 7 * 6 - 6 + 3, 1 * 8 - 8 + 4, 1, 1);
