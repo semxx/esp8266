@@ -1,5 +1,8 @@
 //#define BLYNK_PRINT Serial     // Comment this out to disable prints and save space
 #include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h> // Библиотека для OTA-прошивки
 #include <BlynkSimpleEsp8266.h>
 #include <SimpleTimer.h>         // Essential for all Blynk Projects
 #include <OneWire.h>             //  Для DS18S20, DS18B20, DS1822 
@@ -135,6 +138,10 @@ void(* resetFunc) (void) = 0;               // declare reset function at address
 
 void setup()
 {
+  ArduinoOTA.setHostname("BOILER-NodeMCU"); // Задаем имя сетевого порта
+  //ArduinoOTA.setPassword((const char *)"0000"); // Задаем пароль доступа для удаленной прошивки
+  ArduinoOTA.begin(); // Инициализируем OTA
+
 //Beep(780, 50);
   Wire.begin(SDA,SCL);
   delay(5);
@@ -280,6 +287,7 @@ void handleInterrupt() {
 
 void loop()
 {
+  ArduinoOTA.handle(); // Всегда готовы к прошивке
   currentTime = millis();                       // считываем время, прошедшее с момента запуска программы
   if (gprsSerial.available()) {                 // Если с порта модема идет передача
     char currSymb = gprsSerial.read();          // читаем символ из порта модема
