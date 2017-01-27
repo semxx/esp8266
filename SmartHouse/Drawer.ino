@@ -29,10 +29,44 @@ void UpdateDisplay()
       DrawHistLine();
       break;
     case 7:
-     // DrawHistLine(Floor_2_Text, Addr_Temp_4, Floor_2_Temp);
+      //PrintYesNo = false;
+      PrintRTC(0,0);
+     // timer.run();
       break;
     case 8:
-     // DrawHistPipe(Main_Text, Addr_Temp_2, Main_Temp);    
+      MenuTimeoutTimer = 10; //таймер таймаута, секунд
+      //display.clearDisplay(); 
+      display.setCursor(0, 40);
+      display.print("SET TIME"); //    lcd.print(F("SETUP CLOCK")); 
+      delay(200);
+      clock.getTime();
+      Hours=clock.hour;
+      Minutes=clock.minute;
+      Seconds=clock.second;
+      SetYesNo = false;
+      PrintYesNo = true;
+      SetTime(0,0); // в позиции 0,1 - запрос ввода времени
+      if (MenuTimeoutTimer != 0) {
+        if (SetYesNo)
+        {
+    //      if (BeepEnabled) {
+    //        tone(BeepPin,BeepToneYes,BeepToneYesDuration); //звук "YES"
+        //}
+          clock.fillByHMS(Hours, Minutes, Seconds);    
+          clock.setTime();
+        }
+        else
+        {
+         // if (BeepEnabled) {
+         //   tone(BeepPin,BeepToneNo,BeepToneNoDuration); //звук "NO"
+         //}
+        }
+      }
+      else {
+       // if (BeepEnabled) {
+       //   tone(BeepPin,BeepToneNo,BeepToneNoDuration); //звук "NO"
+        //}
+      }
       break;
     case 9:
       DrawAbout();
