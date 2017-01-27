@@ -1,8 +1,5 @@
 //#define BLYNK_PRINT Serial     // Comment this out to disable prints and save space
 #include <ESP8266WiFi.h>
-#include <ESP8266mDNS.h>
-#include <WiFiUdp.h>
-#include <ArduinoOTA.h> // Библиотека для OTA-прошивки
 #include <BlynkSimpleEsp8266.h>
 #include <SimpleTimer.h>         // Essential for all Blynk Projects
 #include <OneWire.h>             //  Для DS18S20, DS18B20, DS1822 
@@ -16,8 +13,8 @@
 #include <Shift595.h>
 
 #define OLED_RESET LED_BUILTIN   // просто заглушка, oled на i2c работает без подключения этого контакта
-#define Power_GSM_PIN  D9        //GSM Shield при использовании GSM шилда
-#define Reset_GSM_PIN            //GSM Shield при использовании GSM шилда
+#define Power_GSM_PIN  D9        // GSM Shield при использовании GSM шилда
+#define Reset_GSM_PIN            // GSM Shield при использовании GSM шилда
 
 #define SDA            D5        // SDA   GPIO14
 #define SCL            D6        // SCL   GPIO12
@@ -61,6 +58,23 @@ boolean isRelay06 = false;         // Переменная принимает з
 boolean isBlink = false;           // Переменная для мигания
 boolean Connected2Blynk = false;
 boolean inMenu = false;
+boolean encoderR = false;
+boolean encoderL = false;
+
+byte MenuTimeoutTimer;
+
+boolean SetH = false; // выделение часов при отображении
+boolean SetM = false; // выделение минут при отображении
+boolean SetYesNo = false; // выделение Yes/No при установке часов
+boolean blink500ms = false; // мигающий бит, инвертируется каждые 500мс
+static boolean rotating=false;      // debounce management
+
+boolean plus1sec = false; // ежесекундно взводится
+boolean PrintYesNo = false; // показывать ли после времени Yes/No (косвенно - указание на режим установка/отображение)
+
+int Hours = 0; // времянка часов RTC для отображения и установки
+int Minutes = 0; // времянка минут RTC для отображения и установки
+int Seconds;
 
 String ipString =        "";
 String currStr = "";               // переменная для чтения из сомпорта и счения смс и т.д.
@@ -70,7 +84,7 @@ char   First_Number[] = "+79163770340"; // Номер на который в с�
 char   temp_msg[160];                   // Переменная , в нее пишется char для отсылки СМС (работает с sprintf();)
 
 byte num_Screen = 1;   // текущий экран
-byte max_Screen = 6;   // всего экранов
+byte max_Screen = 8;   // всего экранов
 byte batt = 0;         // Переменная хранит заряд батареи
 byte sgsm = 0;         // Переменная хранит уровень сигнала сети
 
@@ -136,19 +150,15 @@ long lastencoderValue = 0;
 
 void(* resetFunc) (void) = 0;               // declare reset function at address 0
 
+
 void setup()
 {
-  ArduinoOTA.setHostname("BOILER-NodeMCU"); // Задаем имя сетевого порта
-  //ArduinoOTA.setPassword((const char *)"0000"); // Задаем пароль доступа для удаленной прошивки
-  ArduinoOTA.begin(); // Инициализируем OTA
-
 //Beep(780, 50);
   Wire.begin(SDA,SCL);
   delay(5);
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
   //display.display();                          // show splashscreen
-  delay(500);
-  // Clear the buffer.
+  delay(500);  // Clear the buffer.
   display.clearDisplay();                    // clears the screen and buffer
   pinMode(btn_Right, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
   pinMode(Power_GSM_PIN, OUTPUT);
@@ -197,6 +207,7 @@ void setup()
   EnergySaveMode =  millis() + 15000; // самое время экономить жизнь OLED
   Last_Tel_Number=First_Number;
   MyWiFi();
+  timer.setInterval(500L, timerHalfSec);
 }
 
 String GetIpString (IPAddress ip) {
@@ -275,8 +286,15 @@ void handleInterrupt() {
   int encoded = (MSB << 1) |LSB;             //converting the 2 pin value to single number
   int sum  = (lastEncoded << 2) | encoded;  //adding it to the previous encoded value
 
-  if(sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) encoderValue ++;
-  if(sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) encoderValue --;
+  if(sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) 
+  { 
+    encoderValue ++;
+    encoderR = true;
+  }
+  if(sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) {
+    encoderValue --;
+    encoderL = true;
+  }
 
   lastEncoded = encoded; //store this value for next time
  //   Serial.print("Encoder: ");
@@ -287,7 +305,6 @@ void handleInterrupt() {
 
 void loop()
 {
-  ArduinoOTA.handle(); // Всегда готовы к прошивке
   currentTime = millis();                       // считываем время, прошедшее с момента запуска программы
   if (gprsSerial.available()) {                 // Если с порта модема идет передача
     char currSymb = gprsSerial.read();          // читаем символ из порта модема
@@ -329,8 +346,23 @@ void loop()
     EnergySaver();
     //EnergySaveMode =  millis() + 45000; // время экономить жизнь OLE
   }
+
+  if (plus1sec) { // если прошла 1 секунда - делаем ежесекундные дела
+        plus1sec = false; // сбрасываем до следующей секунды
+        clock.getTime();// обновляем часы
+        Hours=clock.hour;
+        Minutes=clock.minute;
+        Seconds=clock.second;
+    }
+    
   if(Connected2Blynk){
     Blynk.run();  // only process Blyk.run() function if we are connected to Blynk server
+  }
+  if (num_Screen == 8) 
+  {
+  //display.clearDisplay();  
+  AdjustTime(); 
+  //display.display();  
   }
   if (Floor_1_Temp > 79) { 
       do {
@@ -343,6 +375,7 @@ void loop()
 
   timer.run();
 } // END LOOP
+
 
 void Buzzer(unsigned char delayms) 
 { 
@@ -386,6 +419,7 @@ void ReadButton()
 {
  int sensorVal = digitalRead(btn_Right);
     if (sensorVal == HIGH) {                     // переключение информационных экранов
+        MenuTimeoutTimer = 10; //таймер таймаута, секунд
       if (num_Screen < max_Screen) {
         num_Screen++;
           Buzzer(100); //Beep every 500 milliseconds
