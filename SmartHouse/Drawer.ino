@@ -29,8 +29,8 @@ void UpdateDisplay()
       DrawHistLine();
       break;
     case 7:
-      //PrintYesNo = false;
-      PrintRTC(0,0);
+      PrintYesNo = false;
+      PrintRTC(0,20);
      // timer.run();
       break;
     case 8:
