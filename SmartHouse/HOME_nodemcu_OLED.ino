@@ -294,12 +294,14 @@ void handleInterrupt() {
 
   if(sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) 
   { 
-    encoderValue ++;
+    encoderValue --;
     encoderR = true;
+    MenuTimeoutTimer = 10;
   }
   if(sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) {
-    encoderValue --;
+    encoderValue ++;
     encoderL = true;
+    MenuTimeoutTimer = 10;
   }
 
   lastEncoded = encoded; //store this value for next time
@@ -354,7 +356,7 @@ void loop()
     //EnergySaveMode =  millis() + 45000; // время экономить жизнь OLE
   }
 
-  if (plus1sec) { // если прошла 1 секунда - делаем ежесекундные дела
+  if (plus1sec && !SetH && !SetM) { // если прошла 1 секунда - делаем ежесекундные дела
         plus1sec = false; // сбрасываем до следующей секунды
         clock.getTime();// обновляем часы
         Hours=clock.hour;
