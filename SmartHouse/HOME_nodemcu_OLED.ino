@@ -133,6 +133,7 @@ char Floor_2_Text[11] = "2_flr";
 
 unsigned long currentTime = 0;              // сюда просто сохраняем текущее значение Mills
 unsigned long Next_Update_Draw = 0;         // Время апдейта экрана
+unsigned long Next_Update_Timer = 0;         // Время апдейта таймера
 unsigned long Next_Update_Temp = 0;         // Время апдейта температуры
 unsigned long Next_Update_Screen_Saver = 0; // Время апдейта экрана
 unsigned long EnergySaveMode = 0;           // Время экономить жизнь экрана
@@ -156,6 +157,8 @@ void(* resetFunc) (void) = 0;               // declare reset function at address
 
 void setup()
 {
+ //Serial.begin(115200);
+ delay(50);
   ArduinoOTA.setHostname("BOILER-NodeMCU"); // Задаем имя сетевого порта    
 //ArduinoOTA.setPassword((const char *)"0000"); // Задаем пароль доступа для удаленной прошивки   
   ArduinoOTA.begin(); // Инициализируем OTA
@@ -202,7 +205,7 @@ void setup()
   sensorsDS18B20.begin();
   sensorsDS18B20.requestTemperatures();
   UpdateTemp();
-  Serial.begin(9600);
+
   // Check_GSM();
   // SendStatus();
   // fillHistory();
@@ -223,6 +226,8 @@ String GetIpString (IPAddress ip) {
 
 void MyWiFi(){
   display.clearDisplay(); 
+  //WiFi.disconnect();
+  //delay(200);
   int mytimeout = millis() / 1000;
   int x = 0;
   WiFi.begin(ssid, pass);
@@ -355,8 +360,11 @@ void loop()
     EnergySaver();
     //EnergySaveMode =  millis() + 45000; // время экономить жизнь OLE
   }
-
-  if (plus1sec && !SetH && !SetM) { // если прошла 1 секунда - делаем ежесекундные дела
+ //if (currentTime > Next_Update_Timer) {    // 
+ //     timerHalfSec();
+ //   Next_Update_Timer =  millis() + 500; // 
+ // }
+  if (plus1sec) { // если прошла 1 секунда - делаем ежесекундные дела
         plus1sec = false; // сбрасываем до следующей секунды
         clock.getTime();// обновляем часы
         Hours=clock.hour;
