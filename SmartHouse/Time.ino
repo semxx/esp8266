@@ -75,28 +75,29 @@ void SetTime(char x, char y)
   SetH = true;
   do
   {
-     
+    ESP.wdtDisable();
     PrintRTC(x,y);
     rotating = true;  // reset the debouncer
-if (encoderValue > oldEncoderValue){
+    if (encoderValue > oldEncoderValue){
       Hours += 1;
       if(Hours > 23) {
         Hours = 0;
       };
       oldEncoderValue = encoderValue;
     }
-if (encoderValue < oldEncoderValue) {
+    if (encoderValue < oldEncoderValue) {
       Hours -= 1;
       if(Hours < 0) {
         Hours = 23;
       };
       oldEncoderValue = encoderValue;
     }
-Serial.println(MenuTimeoutTimer);
-Serial.println(digitalRead(btn_Right));    
-//    timer.run();
+    if(Connected2Blynk){
+      Blynk.run();  // only process Blyk.run() function if we are connected to Blynk server
+    }
+    timer.run();
   }
-while ((digitalRead(btn_Right)==1)|(MenuTimeoutTimer==0));  
+while ((MenuTimeoutTimer==0) || (digitalRead(btn_Right)==0));  
 
   //if (BeepEnabled) {
   //  tone(BeepPin,4000,50); //звук "YES"
@@ -109,14 +110,14 @@ while ((digitalRead(btn_Right)==1)|(MenuTimeoutTimer==0));
 
     PrintRTC(0,0);
     rotating = true;  // reset the debouncer
-if (encoderValue > oldEncoderValue){
+    if (encoderValue > oldEncoderValue){
       Minutes += 1;
       if(Minutes > 59) {
         Minutes = 0;
       };
       oldEncoderValue = encoderValue;
     }
-if (encoderValue < oldEncoderValue){
+    if (encoderValue < oldEncoderValue){
       Minutes -= 1;
       if(Minutes < 0) {
         Minutes = 59;
@@ -124,27 +125,31 @@ if (encoderValue < oldEncoderValue){
       oldEncoderValue = encoderValue;
     }
  
-//  timer.run();
+  timer.run();
   }
-  while ((digitalRead(btn_Right)==1)|(MenuTimeoutTimer==0));
+  while ((digitalRead(btn_Right)==0)||(MenuTimeoutTimer==0));
  // if (BeepEnabled) {
  //   tone(BeepPin,4000,50); //звук "YES"
   
   if (PrintYesNo) {
     SetM = false;
-    //delay(200);
+    delay(200);
     // ========= set yes-no
     SetYesNo = false;
     do {
+      ESP.wdtDisable();
       PrintRTC(0,0);
       rotating = true;  // reset the debouncer
       if (encoderValue  != oldEncoderValue){
         SetYesNo = !SetYesNo;
       oldEncoderValue = encoderValue;
       }
-//    timer.run();
+    timer.run();
     }
-    while ((digitalRead(btn_Right)==1)|(MenuTimeoutTimer==0));
+    while ((digitalRead(btn_Right)==0)|(MenuTimeoutTimer==0));
     //delay(200);
-  } 
+  }
+MyPrint(F("Saved.."), 1 * 6 - 6, 3 * 8 - 8, 3, 1);   
+num_Screen = 1;
+ESP.wdtEnable(15000);
 }
