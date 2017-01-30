@@ -15,6 +15,8 @@
 // BAL            Запросить Баланс
 // GSM            Запросить качество сигнала 
 
+void(* resetFunc) (void) = 0;               // declare reset function at address 0
+
 void Parse_Income_SMS()
 {
   Beep(780,100); 
@@ -225,6 +227,9 @@ void Parse_Income_SMS()
   Last_Tel_Number = "";
   sprintf(temp_msg,"");  
 } 
+
+
+
 // 27/10/2015
 void Parse_Income_String()
 {
