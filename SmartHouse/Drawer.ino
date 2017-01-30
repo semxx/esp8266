@@ -130,12 +130,12 @@ if (inMenu) {
   switch (MenuItem)
   {
     case 1:
-      display.drawRect(0, 0, 128, 16, WHITE);
+      display.drawLine(0, 15, 128, 15, WHITE);
       MyPrint(F("Electric"), 3 * 6 - 6, 1 * 8 - 8, 2, 1);
       isAutoHeating = true;
       break;
     case 2:
-      display.drawRect(0, 0, 128, 16, WHITE);
+      display.drawLine(0, 15, 128, 15, WHITE);
       MyPrint(F("Wood mode"), 3 * 6 - 6, 1 * 8 - 8, 2, 1);
       isAutoHeating = false;    
       break;
