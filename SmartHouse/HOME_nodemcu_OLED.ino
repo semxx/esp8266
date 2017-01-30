@@ -2,7 +2,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>    
 #include <WiFiUdp.h>    
-#include <ArduinoOTA.h> // Библиотека для OTA-прошивки
+#include <ArduinoOTA.h>          // Библиотека для OTA-прошивки
 #include <BlynkSimpleEsp8266.h>
 #include <SimpleTimer.h>         // Essential for all Blynk Projects
 #include <OneWire.h>             //  Для DS18S20, DS18B20, DS1822 
@@ -36,18 +36,9 @@
 #define L              D2
 #define numOfRegisters 1         // Указываем количество используемых сдвиговых регистров 74HC595
 
-Adafruit_SSD1306 display(OLED_RESET);
-HardwareSerial & gprsSerial = Serial1;
-SimpleTimer timer;
-DS1307 clock;
-OneWire oneWire(ONE_WIRE_BUS);
-DallasTemperature sensorsDS18B20(&oneWire);
-Servo myservo;  // create servo object to control a servo 
-
 char auth[] = "4921ca8db3bc4cf6a84613ad405d9094";
 char ssid[] = "Xiaomi_2G";
 char pass[] = "panatorium";
-
 
 boolean isAutoHeating = true;      // Переменная принимает значение True, если включили автоподдержание температуры
 boolean isStringMessage = false;   // Переменная принимает значение True, если текущая строка является сообщением
@@ -63,17 +54,13 @@ boolean Connected2Blynk = false;
 boolean inMenu = false;
 boolean encoderR = false;
 boolean encoderL = false;
-
-byte MenuTimeoutTimer;
-
-boolean SetH = false; // выделение часов при отображении
-boolean SetM = false; // выделение минут при отображении
-boolean SetYesNo = false; // выделение Yes/No при установке часов
-boolean blink500ms = false; // мигающий бит, инвертируется каждые 500мс
-static boolean rotating=false;      // debounce management
-
-boolean plus1sec = false; // ежесекундно взводится
-boolean PrintYesNo = false; // показывать ли после времени Yes/No (косвенно - указание на режим установка/отображение)
+boolean SetH = false;              // выделение часов при отображении
+boolean SetM = false;              // выделение минут при отображении
+boolean SetYesNo = false;          // выделение Yes/No при установке часов
+boolean blink500ms = false;        // мигающий бит, инвертируется каждые 500мс
+boolean plus1sec = false;          // ежесекундно взводится
+boolean PrintYesNo = false;        // показывать ли после времени Yes/No (косвенно - указание на режим установка/отображение)
+static boolean rotating=false;     // debounce management
 
 int Hours = 0; // времянка часов RTC для отображения и установки
 int Minutes = 0; // времянка минут RTC для отображения и установки
@@ -84,12 +71,13 @@ String currStr = "";               // переменная для чтения �
 String Last_Tel_Number = "";       // переменная для номера от которого пришло смс или звонок
 String tmp_msg = "";               // Переменная , в нее пишется стринг для отсылки СМС (не работает с sprintf();)
 char   First_Number[] = "+79163770340"; // Номер на который в случае чего будут идти СМС
-char   temp_msg[160];                   // Переменная , в нее пишется char для отсылки СМС (работает с sprintf();)
+char   temp_msg[160];              // Переменная , в нее пишется char для отсылки СМС (работает с sprintf();)
 
-byte num_Screen = 1;   // текущий экран
-byte max_Screen = 8;   // всего экранов
-byte batt = 0;         // Переменная хранит заряд батареи
-byte sgsm = 0;         // Переменная хранит уровень сигнала сети
+byte MenuTimeoutTimer;
+byte num_Screen = 1;               // текущий экран
+byte max_Screen = 8;               // всего экранов
+byte batt = 0;                     // Переменная хранит заряд батареи
+byte sgsm = 0;                     // Переменная хранит уровень сигнала сети
 
 #define test
 
@@ -104,7 +92,7 @@ byte sgsm = 0;         // Переменная хранит уровень си�
   byte Board_Therm[8] = {0x28,0xFF,0x1C,0xEE,0x87,0x16,0x03,0xF5};   // 
   byte Out_Therm[8]   = {0x28,0xFF,0xA2,0xB5,0x90,0x16,0x04,0xE7};   // 
   byte Therm_1[8]     = {0x28,0xFF,0x83,0x8F,0x00,0x15,0x02,0x21};    // INPUT
-  byte Therm_2[8]     = {0x28,0xFF,0x0B,0x0A,0x62,0x15,0x01,0x84};   // OUTPUT
+  byte Therm_2[8]     = {0x28,0xFF,0x0B,0x0A,0x62,0x15,0x01,0x84};   //  OUTPUT
 #endif
 
 int Auto_Temp = 75;       // Дефолтовая автоматически поддерживаемая температура.
@@ -116,6 +104,16 @@ int Floor_2_Temp = 0;     // Температура 2- й этаж
 int SaveHistoryHour = 0;  // переменная для хранения значения последнего часа записи значения тепрературы, что бы записывать раз в час
 int MenuItem = 0;
 int oldEncoderValue  = 0;
+// Подключаем сдвиговый регистр 74HC595
+int latchPin = 3;                           // Пин подключен к ST_CP входу 74HC595 (Оранжевый > 8)
+int clockPin = 1;                           // Пин подключен к SH_CP входу 74HC595  (Коричневый > 12)
+int dataPin = D0;                           // Пин подключен к DS входу 74HC595 (Белый > 11)
+// Переменные для Encoder
+int  lastEncoded = 0;
+int  encoderValue = 0;
+int  lastMSB = 0;
+int  lastLSB = 0;
+long lastencoderValue = 0;
 
 //  Ниже не значения, а адреса ячеек ПЗУ
 int Addr_Auto_Temp = 0;   // Адрес в ПЗУ для Auto_Temp
@@ -133,90 +131,81 @@ char Floor_2_Text[11] = "2_flr";
 
 unsigned long currentTime = 0;              // сюда просто сохраняем текущее значение Mills
 unsigned long Next_Update_Draw = 0;         // Время апдейта экрана
-unsigned long Next_Update_Timer = 0;         // Время апдейта таймера
+unsigned long Next_Update_Timer = 0;        // Время апдейта таймера
 unsigned long Next_Update_Temp = 0;         // Время апдейта температуры
 unsigned long Next_Update_Screen_Saver = 0; // Время апдейта экрана
 unsigned long EnergySaveMode = 0;           // Время экономить жизнь экрана
 
-// Подключаем сдвиговый регистр 74HC595
-int latchPin = 3;                           // Пин подключен к ST_CP входу 74HC595 (Оранжевый > 8)
-int clockPin = 1;                           // Пин подключен к SH_CP входу 74HC595  (Коричневый > 12)
-int dataPin = D0;                           // Пин подключен к DS входу 74HC595 (Белый > 11)
-
+Adafruit_SSD1306 display(OLED_RESET);
+HardwareSerial & gprsSerial = Serial1;
+SimpleTimer timer;
+DS1307 clock;
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensorsDS18B20(&oneWire);
+Servo myservo;                              // create servo object to control a servo 
 Shift595 Shifter(dataPin, latchPin, clockPin, numOfRegisters);
-
-// Переменные для Encoder
-int  lastEncoded = 0;
-int  encoderValue = 0;
-int  lastMSB = 0;
-int  lastLSB = 0;
-long lastencoderValue = 0;
-
-void(* resetFunc) (void) = 0;               // declare reset function at address 0
-
 
 void setup()
 {
- //Serial.begin(115200);
- delay(50);
-  ArduinoOTA.setHostname("BOILER-NodeMCU"); // Задаем имя сетевого порта    
-//ArduinoOTA.setPassword((const char *)"0000"); // Задаем пароль доступа для удаленной прошивки   
-  ArduinoOTA.begin(); // Инициализируем OTA
-//Beep(780, 50);
-  Wire.begin(SDA,SCL);
-  delay(5);
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
-  //display.display();                          // show splashscreen
-  delay(500);  // Clear the buffer.
-  display.clearDisplay();                    // clears the screen and buffer
-  pinMode(btn_Right, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
-  pinMode(Power_GSM_PIN, OUTPUT);
-  pinMode(Relay_1, OUTPUT);
-  pinMode(Relay_2, OUTPUT);
-  pinMode(Relay_3, OUTPUT);
-  pinMode(Relay_4, OUTPUT);
-  pinMode(Relay_5, OUTPUT);
-  pinMode(Relay_6, OUTPUT);
-  pinMode(Speaker, OUTPUT); //Set buzzerPin as output
-  digitalWrite(Speaker, HIGH);
-  digitalWrite(Power_GSM_PIN, LOW);
-  digitalWrite(Relay_1, LOW);
-  digitalWrite(Relay_2, LOW);
-  digitalWrite(Relay_3, LOW);
-  digitalWrite(Relay_4, LOW);
-  digitalWrite(Relay_5, LOW);
-  digitalWrite(Relay_6, LOW);
-  pinMode(R, INPUT_PULLUP); //  ENCODER RIGHT
-  pinMode(L, INPUT_PULLUP); //  ENCODER LEFT
-  digitalWrite(R, HIGH);    //  turn pullup resistor on
-  digitalWrite(L, HIGH);    //  turn pullup resistor on  
-  attachInterrupt(digitalPinToInterrupt(R), handleInterrupt, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(L), handleInterrupt, CHANGE);
-  Shifter.setRegisterPin(1, HIGH);
-  Shifter.setRegisterPin(2, HIGH);
-  Shifter.setRegisterPin(3, HIGH);
-  Shifter.setRegisterPin(4, HIGH);
-  EEPROM.begin(512);
-  delay(10);
-  gprsSerial.begin(9600);
-  clock.begin();
-  myservo.attach(0);
-  Read_Eprom();
-  sensorsDS18B20.begin();
-  sensorsDS18B20.requestTemperatures();
-  UpdateTemp();
-
-  // Check_GSM();
-  // SendStatus();
-  // fillHistory();
-  // clock.fillByYMD(2016,01,10);
-  // clock.fillByHMS(22,32,00);
-  // clock.setTime();
-  // EEPROM.write(addr_Auto_Temp, 24);
-  EnergySaveMode =  millis() + 15000; // самое время экономить жизнь OLED
-  Last_Tel_Number=First_Number;
-  MyWiFi();
-  timer.setInterval(500L, timerHalfSec);
+    ArduinoOTA.setHostname("BOILER-NodeMCU"); // Задаем имя сетевого порта    
+//  ArduinoOTA.setPassword((const char *)"0000"); // Задаем пароль доступа для удаленной прошивки   
+    ArduinoOTA.begin(); // Инициализируем OTA
+    Wire.begin(SDA,SCL);
+    delay(5);
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
+//  display.display();                          // show splashscreen
+    delay(500);  // Clear the buffer.
+    display.clearDisplay();                    // clears the screen and buffer
+    pinMode(btn_Right, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
+    pinMode(Power_GSM_PIN, OUTPUT);
+    pinMode(Relay_1, OUTPUT);
+    pinMode(Relay_2, OUTPUT);
+    pinMode(Relay_3, OUTPUT);
+    pinMode(Relay_4, OUTPUT);
+    pinMode(Relay_5, OUTPUT);
+    pinMode(Relay_6, OUTPUT);
+    pinMode(Speaker, OUTPUT); //Set buzzerPin as output
+    digitalWrite(Speaker, HIGH);
+    digitalWrite(Power_GSM_PIN, LOW);
+    digitalWrite(Relay_1, LOW);
+    digitalWrite(Relay_2, LOW);
+    digitalWrite(Relay_3, LOW);
+    digitalWrite(Relay_4, LOW);
+    digitalWrite(Relay_5, LOW);
+    digitalWrite(Relay_6, LOW);
+    pinMode(R, INPUT_PULLUP); //  ENCODER RIGHT
+    pinMode(L, INPUT_PULLUP); //  ENCODER LEFT
+    digitalWrite(R, HIGH);    //  turn pullup resistor on
+    digitalWrite(L, HIGH);    //  turn pullup resistor on  
+    attachInterrupt(digitalPinToInterrupt(R), handleInterrupt, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(L), handleInterrupt, CHANGE);
+    Shifter.setRegisterPin(1, HIGH);
+    Shifter.setRegisterPin(2, HIGH);
+    Shifter.setRegisterPin(3, HIGH);
+    Shifter.setRegisterPin(4, HIGH);
+    EEPROM.begin(512);
+    delay(10);
+    gprsSerial.begin(9600);
+    clock.begin();
+    myservo.attach(0);
+    Read_Eprom();
+    sensorsDS18B20.begin();
+    sensorsDS18B20.requestTemperatures();
+    UpdateTemp();
+//  Serial.begin(115200);
+//  delay(50);
+//  Beep(780, 50);
+//  Check_GSM();
+//  SendStatus();
+//  fillHistory();
+//  clock.fillByYMD(2016,01,10);
+//  clock.fillByHMS(22,32,00);
+//  clock.setTime();
+//  EEPROM.write(addr_Auto_Temp, 24);
+    EnergySaveMode =  millis() + 15000; // самое время экономить жизнь OLED
+    Last_Tel_Number=First_Number;
+    MyWiFi();
+    timer.setInterval(500L, timerHalfSec);
 }
 
 String GetIpString (IPAddress ip) {
@@ -264,9 +253,7 @@ void MyWiFi(){
             display.display();
            }
            while (((millis() / 1000) > mytimeout + 1)); 
-
           } 
-     
   Blynk.config(auth);
   Connected2Blynk = Blynk.connect(1000);  // 1000 is a timeout of 3333 milliseconds 
   mytimeout = millis() / 1000;
@@ -277,7 +264,6 @@ void MyWiFi(){
   }
   display.clearDisplay(); 
 }
-
 
 void CheckConnection(){
   Connected2Blynk = Blynk.connected();
@@ -310,8 +296,6 @@ void handleInterrupt() {
   }
 
   lastEncoded = encoded; //store this value for next time
- //   Serial.print("Encoder: ");
- //   Serial.println(encoderValue);
   Next_Update_Screen_Saver =  millis() + 60000;    
   EnergySaveMode =  millis() + 45000; // время экономить жизнь OLED
 }
@@ -358,12 +342,7 @@ void loop()
   if (currentTime > EnergySaveMode) {    // время включать скринсейвер на экране
     num_Screen = 10;
     EnergySaver();
-    //EnergySaveMode =  millis() + 45000; // время экономить жизнь OLE
   }
- //if (currentTime > Next_Update_Timer) {    // 
- //     timerHalfSec();
- //   Next_Update_Timer =  millis() + 500; // 
- // }
   if (plus1sec) { // если прошла 1 секунда - делаем ежесекундные дела
         plus1sec = false; // сбрасываем до следующей секунды
         clock.getTime();// обновляем часы
@@ -375,12 +354,7 @@ void loop()
   if(Connected2Blynk){
     Blynk.run();  // only process Blyk.run() function if we are connected to Blynk server
   }
-  if (num_Screen == 8) 
-  {
-  //display.clearDisplay();  
-  AdjustTime(); 
-  //display.display();  
-  }
+  
   if (Floor_1_Temp > 79) { 
       do {
           Buzzer(100); //Beep every 500 milliseconds
@@ -396,10 +370,10 @@ void loop()
 
 void Buzzer(unsigned char delayms) 
 { 
-  analogWrite(Speaker, 1024); //Setting pin to high
-  delay(delayms); //Delaying
-  analogWrite(Speaker ,0); //Setting pin to LOW
-  delay(delayms); //Delaying
+  analogWrite(Speaker, 1024);       //Setting pin to high
+  delay(delayms);                   //Delaying
+  analogWrite(Speaker ,0);          //Setting pin to LOW
+  delay(delayms);                   //Delaying
 }
 
 void Beep(word frq, word dur)
@@ -435,18 +409,18 @@ EEPROM.commit();
 void ReadButton()
 {
  int sensorVal = digitalRead(btn_Right);
-    if (sensorVal == HIGH) {                     // переключение информационных экранов
-        MenuTimeoutTimer = 10; //таймер таймаута, секунд
+    if (sensorVal == HIGH) {                        // переключение информационных экранов
+        MenuTimeoutTimer = 10;                      //таймер таймаута, секунд
       if (num_Screen < max_Screen) {
         num_Screen++;
-          Buzzer(100); //Beep every 500 milliseconds
+          Buzzer(100);                              //Beep every 500 milliseconds
           delay(150);
       }
       else  {
         num_Screen = 1;
       }
       Next_Update_Screen_Saver =  millis() + 30000; // время для включения скринсейвера
-      EnergySaveMode =  millis() + 45000; // время экономить жизнь OLED
+      EnergySaveMode =  millis() + 45000;           // время экономить жизнь OLED
       Beep(500, 20);
     }
 }
@@ -458,7 +432,7 @@ if (batt > 10)  {
       isCalling = false;
     }
     else  {
-      batt++; // зарядка для батарейки
+      batt++;                                       // зарядка для батарейки
     }
 }    
 
