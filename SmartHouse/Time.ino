@@ -10,9 +10,7 @@ void timerHalfSec()
   }
 }
 
-void AdjustTime(){
 
-  }
 void PrintRTC(char x, char y)
 {
   display.clearDisplay();
