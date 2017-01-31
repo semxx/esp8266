@@ -34,39 +34,39 @@ void UpdateDisplay()
      // timer.run();
       break;
     case 8:
-      MenuTimeoutTimer = 10; //таймер таймаута, секунд
-      //display.clearDisplay(); 
-      display.setCursor(0, 40);
-      display.print("SET TIME"); //    lcd.print(F("SETUP CLOCK")); 
-      delay(200);
-      clock.getTime();
-      Hours=clock.hour;
-      Minutes=clock.minute;
-      Seconds=clock.second;
-      SetYesNo = false;
-      PrintYesNo = true;
-      SetTime(0,0); // в позиции 0,1 - запрос ввода времени
-      if (MenuTimeoutTimer != 0) {
-        if (SetYesNo)
-        {
-    //      if (BeepEnabled) {
-    //        tone(BeepPin,BeepToneYes,BeepToneYesDuration); //звук "YES"
-        //}
-          clock.fillByHMS(Hours, Minutes, Seconds);    
-          clock.setTime();
-        }
-        else
-        {
-         // if (BeepEnabled) {
-         //   tone(BeepPin,BeepToneNo,BeepToneNoDuration); //звук "NO"
-         //}
-        }
-      }
-      else {
-       // if (BeepEnabled) {
-       //   tone(BeepPin,BeepToneNo,BeepToneNoDuration); //звук "NO"
-        //}
-      }
+          {
+              MenuTimeoutTimer = 10; //таймер таймаута, секунд
+              display.setCursor(0, 40);
+              display.print("SET TIME"); //    lcd.print(F("SETUP CLOCK")); 
+              clock.getTime();
+              Hours=clock.hour;
+              Minutes=clock.minute;
+              Seconds=clock.second;
+              SetYesNo = false;
+              PrintYesNo = true;
+              SetTime(0,0); // в позиции 0,1 - запрос ввода времени
+              if (MenuTimeoutTimer != 0) {
+                if (SetYesNo)
+                {
+                  if (BeepEnabled) {
+                  // tone(BeepPin,BeepToneYes,BeepToneYesDuration); //звук "YES"
+                 }
+                  clock.fillByHMS(Hours, Minutes, Seconds);    
+                  clock.setTime();
+                }
+                else
+                {
+                  if (BeepEnabled) {
+                 //   tone(BeepPin,BeepToneNo,BeepToneNoDuration); //звук "NO"
+                 }
+                }
+              }
+              else {
+                if (BeepEnabled) {
+               //   tone(BeepPin,BeepToneNo,BeepToneNoDuration); //звук "NO"
+                }
+              }
+          }
       break;
     case 9:
       DrawAbout();
@@ -130,12 +130,12 @@ if (inMenu) {
   switch (MenuItem)
   {
     case 1:
-      display.drawLine(0, 15, 128, 15, WHITE);
+      display.drawRect(0, 0, 128, 16, WHITE);
       MyPrint(F("Electric"), 3 * 6 - 6, 1 * 8 - 8, 2, 1);
       isAutoHeating = true;
       break;
     case 2:
-      display.drawLine(0, 15, 128, 15, WHITE);
+      display.drawRect(0, 0, 128, 16, WHITE);
       MyPrint(F("Wood mode"), 3 * 6 - 6, 1 * 8 - 8, 2, 1);
       isAutoHeating = false;    
       break;
