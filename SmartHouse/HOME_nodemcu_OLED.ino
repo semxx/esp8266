@@ -14,6 +14,8 @@
 #include <Adafruit_SSD1306.h>    // русификация шрифта  http://focuswitharduino.blogspot.ru/2015/03/lcd-nokia-5110.html
 #include <Servo.h> 
 #include <Shift595.h>
+#include <SoftwareSerial.h>
+
 
 #define OLED_RESET LED_BUILTIN   // просто заглушка, oled на i2c работает без подключения этого контакта
 #define Power_GSM_PIN  D9        // GSM Shield при использовании GSM шилда
@@ -60,6 +62,7 @@ boolean SetYesNo = false;          // выделение Yes/No при уста�
 boolean blink500ms = false;        // мигающий бит, инвертируется каждые 500мс
 boolean plus1sec = false;          // ежесекундно взводится
 boolean PrintYesNo = false;        // показывать ли после времени Yes/No (косвенно - указание на режим установка/отображение)
+boolean BeepEnabled = true;
 static boolean rotating=false;     // debounce management
 
 int Hours = 0; // времянка часов RTC для отображения и установки
@@ -136,14 +139,16 @@ unsigned long Next_Update_Temp = 0;         // Время апдейта тем�
 unsigned long Next_Update_Screen_Saver = 0; // Время апдейта экрана
 unsigned long EnergySaveMode = 0;           // Время экономить жизнь экрана
 
+SoftwareSerial gprsSerial(1, 3);            // установка контактов 1 и 3 для программного порта
+Shift595 Shifter(dataPin, latchPin, clockPin, numOfRegisters);
 Adafruit_SSD1306 display(OLED_RESET);
-HardwareSerial & gprsSerial = Serial1;
+//HardwareSerial & gprsSerial = Serial1;
 SimpleTimer timer;
 DS1307 clock;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensorsDS18B20(&oneWire);
 Servo myservo;                              // create servo object to control a servo 
-Shift595 Shifter(dataPin, latchPin, clockPin, numOfRegisters);
+
 
 void setup()
 {
@@ -195,8 +200,8 @@ void setup()
 //  Serial.begin(115200);
 //  delay(50);
 //  Beep(780, 50);
-//  Check_GSM();
-//  SendStatus();
+    Check_GSM();
+    SendStatus();
 //  fillHistory();
 //  clock.fillByYMD(2016,01,10);
 //  clock.fillByHMS(22,32,00);
@@ -304,6 +309,7 @@ void loop()
 {
   ArduinoOTA.handle(); // Всегда готовы к прошивке 
   currentTime = millis();                       // считываем время, прошедшее с момента запуска программы
+
   if (gprsSerial.available()) {                 // Если с порта модема идет передача
     char currSymb = gprsSerial.read();          // читаем символ из порта модема
     //Serial.println(currSymb);
@@ -311,7 +317,7 @@ void loop()
       currStr += String(currSymb);              // не конец строки добавляем в строку символ
     }
     else {                                      // конец строки начинаем ее разбор
-//      Parse_Income_String();
+      Parse_Income_String();
     }
   }
   
@@ -343,6 +349,7 @@ void loop()
     num_Screen = 10;
     EnergySaver();
   }
+  
   if (plus1sec) { // если прошла 1 секунда - делаем ежесекундные дела
         plus1sec = false; // сбрасываем до следующей секунды
         clock.getTime();// обновляем часы
@@ -434,7 +441,7 @@ if (batt > 10)  {
     else  {
       batt++;                                       // зарядка для батарейки
     }
-}    
+}
 
 void SaveHistoty()
 {
@@ -545,7 +552,6 @@ void UpdateTemp()
     sprintf(temp_msg, "out=%dC,main=%dC,floor_1=%dC,floor_2=%dC, time: %d:%d", Out_Temp, Main_Temp, Floor_1_Temp, Floor_2_Temp, clock.hour, clock.minute);
 //    SendTextMessage(Last_Tel_Number, F("ALARM TEMP. Floor REALAY OFF"), temp_msg);
   }
-
 
 }
 
