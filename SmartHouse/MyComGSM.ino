@@ -48,11 +48,11 @@ OK
 
 void GSM_ON()   
 { 
-  digitalWrite(Power_GSM_PIN, LOW);
-  delay(300);
-  digitalWrite(Power_GSM_PIN, HIGH);
-  delay(700);
-  digitalWrite(Power_GSM_PIN, LOW);
+//  digitalWrite(Power_GSM_PIN, LOW);
+//  delay(300);
+//  digitalWrite(Power_GSM_PIN, HIGH);
+//  delay(700);
+//  digitalWrite(Power_GSM_PIN, LOW);
   gprsSerial.print(F("AT+CLTS=1\r")); // Разрешаем GSM модулю устанавливать локальное время сотового оператора
   delay(50);  // даем время модему ответить
   gprsSerial.print(F("AT+CMGF=1\r"));
@@ -61,12 +61,12 @@ void GSM_ON()
   delay(50);  // даем время модему ответить
   gprsSerial.print(F("AT+CNMI=1,2,2,1,0\r")); 
   delay(50);  // даем время модему ответить
-  Beep(780,100); 
+ // Beep(780,100); 
   
 }  
 
 void gprs_init() {  //Процедура начальной инициализации GSM модуля
-  int d = 500;
+  int d = 200;
   int ATsCount = 11;
   String ATs[] = {  //массив АТ команд
     "AT+CLTS=1",
@@ -81,29 +81,32 @@ void gprs_init() {  //Процедура начальной инициализа
     "AT+HTTPINIT",  //Инициализация http сервиса
     "AT+HTTPPARA=\"CID\",1"  //Установка CID параметра для http сессии
   };
-  int ATsDelays[] = {1, 1, 1, 1, 6, 1, 1, 1, 3, 3, 1}; //массив задержек
-  Serial.println("GPRG init start");
+  int ATsDelays[] = {2, 2, 2, 2, 25, 2, 2, 2, 3, 3, 2}; //массив задержек
+  Serial.println("GPRS init start");
   for (int i = 0; i < ATsCount; i++) {
     Serial.println(ATs[i]);  //посылаем в монитор порта
     gprsSerial.println(ATs[i]);  //посылаем в GSM модуль
-    yield();
+//    yield();
     delay(d * ATsDelays[i]);
+//    yield();
     Serial.println(ReadGSM());  //показываем ответ от GSM модуля
-    yield();
+//    yield();
     delay(d);
+//    SendStatus();
   }
   Serial.println("GPRS init complete");
 }
 void Check_GSM() // Проверка что модем отвечает, если нет то включим его.
 {
   //gprsSerial.print(F("AT\r"));
-  Serial.println("Check_GSM()");
-  gprsSerial.println("AT+CSQ");  //запрос качество сигнала
-  delay(50);  // даем время модему ответить
-  Serial.println(ReadGSM());  //показываем ответ от GSM модуля
+  //Serial.println("Check_GSM()");
+  //gprsSerial.println("AT+CSQ");  //запрос качество сигнала
+  //delay(50);  // даем время модему ответить
+  //Serial.println(ReadGSM());  //показываем ответ от GSM модуля
   if (!gprsSerial.available())  { 
-    gprs_init();
-    yield();
+    GSM_ON();
+    //gprs_init();
+//    yield();
     Serial.println("Check_GSM(FAIL) TURN GSM ON");
   }
   else {
