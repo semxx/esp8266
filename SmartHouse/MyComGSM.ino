@@ -1,4 +1,50 @@
 // 27/10/2015
+/*
+AT+SAPBR=3,1,"CONTYPE","GPRS"
+AT+SAPBR=3,1,"APN","internet.mts.ru"
+AT+SAPBR=3,1,"USER","mts"
+AT+SAPBR=3,1,"PWD",""
+AT+SAPBR=1,1
+AT+HTTPINIT
+AT+HTTPPARA="CID",1
+AT+HTTPPARA="URL","https://api.telegram.org/bot165672905:AAFhk3XgHITZGDA_M2XEoxAhFaOdxl1Wf6Q/sendMessage?chat_id=161933663&text=System started over SIM800L and GPRS"
+AT+HTTPSSL=1
+AT+HTTPACTION=0
+
+ERORS:
+600 Not HTTP PDU
+601 Network Error
+602 No memory
+603 DNS Error
+604 Stack Busy
+
+
+LOG: RETURNED VALUE
+
+AT+SAPBR=3,1,"CONTYPE","GPRS"
+OK
+AT+SAPBR=3,1,"APN","internet.mts.ru"
+OK
+AT+SAPBR=3,1,"USER","mts"
+OK
+AT+SAPBR=3,1,"PWD",""
+OK 
+AT+SAPBR=1,1
+OK
+AT+HTTPINIT
+OK
+AT+HTTPPARA="CID",1
+OK
+AT+HTTPPARA="URL","https://api.telegram.org/bot165672905:AAFhk3XgHITZGDA_M2XEoxAhFaOdxl1Wf6Q/sendMessage?chat_id=161933663&text=System started over SIM800L and GPRS"
+OK
+AT+HTTPSSL=1
+OK
+AT+HTTPACTION=0
+OK
+
++HTTPACTION: 0,200,280
+
+*/
 
 void GSM_ON()   
 { 
@@ -19,6 +65,62 @@ void GSM_ON()
   
 }  
 
+void gprs_init() {  //Процедура начальной инициализации GSM модуля
+  int d = 500;
+  int ATsCount = 11;
+  String ATs[] = {  //массив АТ команд
+    "AT+CLTS=1",
+    "AT+CMGF=1",
+    "AT+IFC=1, 1",
+    "AT+CNMI=1,2,2,1,0",
+    "AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\"",  //Установка настроек подключения
+    "AT+SAPBR=3,1,\"APN\",\"internet.mts.ru\"",
+    "AT+SAPBR=3,1,\"USER\",\"mts\"",
+    "AT+SAPBR=3,1,\"PWD\",\"\"",
+    "AT+SAPBR=1,1",  //Устанавливаем GPRS соединение
+    "AT+HTTPINIT",  //Инициализация http сервиса
+    "AT+HTTPPARA=\"CID\",1"  //Установка CID параметра для http сессии
+  };
+  int ATsDelays[] = {1, 1, 1, 1, 6, 1, 1, 1, 3, 3, 1}; //массив задержек
+  Serial.println("GPRG init start");
+  for (int i = 0; i < ATsCount; i++) {
+    Serial.println(ATs[i]);  //посылаем в монитор порта
+    gprsSerial.println(ATs[i]);  //посылаем в GSM модуль
+    yield();
+    delay(d * ATsDelays[i]);
+    Serial.println(ReadGSM());  //показываем ответ от GSM модуля
+    yield();
+    delay(d);
+  }
+  Serial.println("GPRS init complete");
+}
+void Check_GSM() // Проверка что модем отвечает, если нет то включим его.
+{
+  //gprsSerial.print(F("AT\r"));
+  Serial.println("Check_GSM()");
+  gprsSerial.println("AT+CSQ");  //запрос качество сигнала
+  delay(50);  // даем время модему ответить
+  Serial.println(ReadGSM());  //показываем ответ от GSM модуля
+  if (!gprsSerial.available())  { 
+    gprs_init();
+    yield();
+    Serial.println("Check_GSM(FAIL) TURN GSM ON");
+  }
+  else {
+     Serial.println("Check_GSM(OK)");
+  }
+}
+
+String ReadGSM() {  //функция чтения данных от GSM модуля
+  int c;
+  String v;
+  while (gprsSerial.available()) {  //сохраняем входную строку в переменную v
+    c = gprsSerial.read();
+    v += char(c);
+    delay(10);
+  }
+  return v;
+}
 
 void SendHistory(String Str , byte Addr)
 {
@@ -37,26 +139,8 @@ void SendHistory(String Str , byte Addr)
     }
   } 
   Serial.println(tmp_msg);
-  //SendTextMessage(First_Number, Str, tmp_msg ); 
+  SendTextMessage(First_Number, Str, tmp_msg ); 
 }
-
-
-void Check_GSM() // Проверка что модем отвечает, если нет то включим его.
-{
-  //gprsSerial.print(F("AT\r"));
-  Serial.println("Check_GSM()");
-  gprsSerial.println("AT+CSQ");  //запрос качество сигнала
-  delay(200);  // даем время модему ответить
-  if (!gprsSerial.available())  { 
-    GSM_ON();
-    Serial.println("Check_GSM(FAIL) TURN GSM ON");
-  }
-  else {
-     Serial.println("Check_GSM(OK)");
-  }
-}
-
-
 
 void SendStatus()
 {
@@ -71,8 +155,6 @@ void SendStatus()
     SendTextMessage(Last_Tel_Number,"Stand By,", temp_msg);  
   }  
 }
-
-
 
 void SendTextMessage(String sms_number, String sms_text1, String sms_text2) 
 {
@@ -95,8 +177,6 @@ void SendTextMessage(String sms_number, String sms_text1, String sms_text2)
 }
 
 
-
-
 /* 
 void SendBalance() // Проверка ответа модема , ловим смс с балансом от оператора
 {
@@ -111,7 +191,7 @@ void SendBalance() // Проверка ответа модема , ловим с
 
 
 // --------------------------------------------------------------------------------
-//
+//  http://we.easyelectronics.ru/blog/part/369.html  
 //  AT — простейшая команда, при которой GPRS Shield ничего не делает, в случае правильного подключения возвращает в ответ OK
 //  ATA — команда принять входящий вызов. Сам факт вызова устанавливается регулярно приходящими с платы во время звонка сообщениями RING
 //  AT+CHUP — отклонить вызов
@@ -141,4 +221,15 @@ void SendBalance() // Проверка ответа модема , ловим с
 //      +CMT: "+79646353331","","13/11/15,11:59:51+16"
 //  Входящий звонок
 //      +CLIP: "+79646353331",145,"",,"",0
-//    
+//
+//    GPRS.
+//    Настройка и установка GPRS соединения:
+//    AT+SAPBR=3,1,«CONTYPE»,«GPRS»
+//    AT+SAPBR=3,1,«APN»,«internet.beeline.ru»
+//    AT+SAPBR=3,1,«USER»,«beeline»
+//    AT+SAPBR=3,1,«PWD»,«beeline»
+//    AT+SAPBR=1,1 — установка GPRS связи
+//    AT+SAPBR=2,1 — полученный IP адрес
+//    +SAPBR: 1,1,«10.229.9.115»
+//    AT+SAPBR=4,1 — текущие настройки соединения
+//    AT+SAPBR=0,1 — разорвать GPRS соединение    
