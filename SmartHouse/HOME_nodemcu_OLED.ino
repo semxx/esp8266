@@ -34,8 +34,8 @@
 #define ONE_WIRE_BUS   D7        // Линия датчиков DS18B20
 #define btn_Right      D8        // Кнопа смены статусных экранов 
 #define ENCODER_ON               // Включить поддержку энкодера
-#define R              D1
-#define L              D2
+#define R              D9   //D1
+#define L              D9   //D2
 #define numOfRegisters 1         // Указываем количество используемых сдвиговых регистров 74HC595
 
 char auth[] = "4921ca8db3bc4cf6a84613ad405d9094";
@@ -139,7 +139,7 @@ unsigned long Next_Update_Temp = 0;         // Время апдейта тем�
 unsigned long Next_Update_Screen_Saver = 0; // Время апдейта экрана
 unsigned long EnergySaveMode = 0;           // Время экономить жизнь экрана
 
-SoftwareSerial gprsSerial(1, 3);            // установка контактов 1 и 3 для программного порта
+SoftwareSerial gprsSerial(D1, D2);            // установка контактов 1 и 3 для программного порта
 Shift595 Shifter(dataPin, latchPin, clockPin, numOfRegisters);
 Adafruit_SSD1306 display(OLED_RESET);
 //HardwareSerial & gprsSerial = Serial1;
@@ -148,7 +148,6 @@ DS1307 clock;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensorsDS18B20(&oneWire);
 Servo myservo;                              // create servo object to control a servo 
-
 
 void setup()
 {
@@ -161,6 +160,7 @@ void setup()
 //  display.display();                          // show splashscreen
     delay(500);  // Clear the buffer.
     display.clearDisplay();                    // clears the screen and buffer
+    Last_Tel_Number=First_Number;
     pinMode(btn_Right, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
     pinMode(Power_GSM_PIN, OUTPUT);
     pinMode(Relay_1, OUTPUT);
@@ -171,7 +171,7 @@ void setup()
     pinMode(Relay_6, OUTPUT);
     pinMode(Speaker, OUTPUT); //Set buzzerPin as output
     digitalWrite(Speaker, HIGH);
-    digitalWrite(Power_GSM_PIN, LOW);
+    digitalWrite(Power_GSM_PIN, HIGH);
     digitalWrite(Relay_1, LOW);
     digitalWrite(Relay_2, LOW);
     digitalWrite(Relay_3, LOW);
@@ -197,10 +197,12 @@ void setup()
     sensorsDS18B20.begin();
     sensorsDS18B20.requestTemperatures();
     UpdateTemp();
-//  Serial.begin(115200);
+    Serial.begin(9600);
 //  delay(50);
 //  Beep(780, 50);
-    gprs_init();
+   MyWiFi();
+//   gprs_init();
+    GSM_ON();
     Check_GSM();
     SendStatus();
 //  fillHistory();
@@ -209,8 +211,8 @@ void setup()
 //  clock.setTime();
 //  EEPROM.write(addr_Auto_Temp, 24);
     EnergySaveMode =  millis() + 15000; // самое время экономить жизнь OLED
-    Last_Tel_Number=First_Number;
-    MyWiFi();
+
+ 
     timer.setInterval(500L, timerHalfSec);
 }
 
@@ -225,6 +227,7 @@ void MyWiFi(){
   //delay(200);
   int mytimeout = millis() / 1000;
   int x = 0;
+//  WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, pass);
   delay(500);
   while (WiFi.status() != WL_CONNECTED) {
@@ -260,6 +263,7 @@ void MyWiFi(){
            }
            while (((millis() / 1000) > mytimeout + 1)); 
           } 
+
   Blynk.config(auth);
   Connected2Blynk = Blynk.connect(1000);  // 1000 is a timeout of 3333 milliseconds 
   mytimeout = millis() / 1000;
@@ -310,10 +314,32 @@ void loop()
 {
   ArduinoOTA.handle(); // Всегда готовы к прошивке 
   currentTime = millis();                       // считываем время, прошедшее с момента запуска программы
+  if (gprsSerial.available())                  // Если с порта модема идет передача
+  {
+    char currSymb = gprsSerial.read();         //  читаем символ из порта модема
+ //   Serial.println(currSymb);
+    if ('\n' != currSymb) {
+      currStr += String(currSymb);             // не конец строки добавляем в строку символ
+    }
+    else {                                     
+      Parse_Income_String();                   // конец строки начинаем ее разбор
+    }
+  }
+/*  
+if (gprsSerial.available()) {  //если GSM модуль что-то послал нам, то
+    Serial.println(ReadGSM());  //печатаем в монитор порта пришедшую строку
+    char currSymb = gprsSerial.read();          // читаем символ из порта модема
+      if ('\n' != currSymb) {
+      currStr += String(currSymb);              // не конец строки добавляем в строку символ
+    }
+    else {                                      // конец строки начинаем ее разбор
+      Parse_Income_String();
+    }
+  }
 
   if (gprsSerial.available()) {                 // Если с порта модема идет передача
     char currSymb = gprsSerial.read();          // читаем символ из порта модема
-    //Serial.println(currSymb);
+    Serial.println(currSymb);
     if ('\n' != currSymb) {
       currStr += String(currSymb);              // не конец строки добавляем в строку символ
     }
@@ -321,7 +347,7 @@ void loop()
       Parse_Income_String();
     }
   }
-  
+  */
   if (currentTime > Next_Update_Draw) {         // время перерисовать экран
     ReadButton();
     UpdateDisplay();
@@ -338,7 +364,8 @@ void loop()
     // Serial.println(WIFI_getRSSIasQuality(WiFi.RSSI()));
     // CheckConnection();
     Next_Update_Temp =  millis() + 30000;       // отсчитываем по 30 секунд
-    // Check_GSM();
+    Check_GSM();
+    //gprs_init();
   }
 
   if (currentTime > Next_Update_Screen_Saver && currentTime < EnergySaveMode) {    // время включать скринсейвер на экране
