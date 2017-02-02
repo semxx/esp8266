@@ -18,7 +18,7 @@
 
 
 #define OLED_RESET LED_BUILTIN   // просто заглушка, oled на i2c работает без подключения этого контакта
-#define Power_GSM_PIN  D9        // GSM Shield при использовании GSM шилда
+#define Power_GSM_PIN  D0        // GSM Shield при использовании GSM шилда
 #define Reset_GSM_PIN            // GSM Shield при использовании GSM шилда
 
 #define SDA            D5        // SDA   GPIO14
@@ -73,7 +73,7 @@ String ipString =        "";
 String currStr = "";               // переменная для чтения из сомпорта и счения смс и т.д.
 String Last_Tel_Number = "";       // переменная для номера от которого пришло смс или звонок
 String tmp_msg = "";               // Переменная , в нее пишется стринг для отсылки СМС (не работает с sprintf();)
-char   First_Number[] = "+79163770340"; // Номер на который в случае чего будут идти СМС
+char   First_Number[] = "+79263896176"; // Номер на который в случае чего будут идти СМС
 char   temp_msg[160];              // Переменная , в нее пишется char для отсылки СМС (работает с sprintf();)
 
 byte MenuTimeoutTimer;
@@ -110,7 +110,7 @@ int oldEncoderValue  = 0;
 // Подключаем сдвиговый регистр 74HC595
 int latchPin = 3;                           // Пин подключен к ST_CP входу 74HC595 (Оранжевый > 8)
 int clockPin = 1;                           // Пин подключен к SH_CP входу 74HC595  (Коричневый > 12)
-int dataPin = D0;                           // Пин подключен к DS входу 74HC595 (Белый > 11)
+int dataPin = D9;                           // Пин подключен к DS входу 74HC595 (Белый > 11)
 // Переменные для Encoder
 int  lastEncoded = 0;
 int  encoderValue = 0;
@@ -200,6 +200,7 @@ void setup()
 //  Serial.begin(115200);
 //  delay(50);
 //  Beep(780, 50);
+    gprs_init();
     Check_GSM();
     SendStatus();
 //  fillHistory();
