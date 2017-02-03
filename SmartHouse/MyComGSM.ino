@@ -54,17 +54,17 @@ void GSM_ON()
 //  delay(700);
 //  digitalWrite(Power_GSM_PIN, LOW);
 
- gprsSerial.print("AT+CMGF=1\r");
- delay(500); // задержка на обработку команды
+ gprsSerial.print(F("AT+CLTS=1\r")); // Разрешаем GSM модулю устанавливать локальное время сотового оператора   
+ delay(50); // задержка на обработку команды
  toSerial();
  gprsSerial.print(F("AT+CMGF=1\r"));
- delay(500);
+ delay(50);
  toSerial();
  gprsSerial.print(F("AT+IFC=1, 1\r"));
- delay(500); // задержка на обработку команды
+ delay(150); // задержка на обработку команды
  toSerial();
  gprsSerial.print(F("AT+CNMI=1,2,2,1,0\r")); 
- delay(700);
+ delay(300);
  toSerial();
   
   
@@ -107,7 +107,7 @@ void Check_GSM() // Проверка что модем отвечает, есл�
   //Serial.println("Check_GSM()");
   //gprsSerial.println("AT+CSQ");  //запрос качество сигнала
   delay(50);  // даем время модему ответить
-  //Serial.println(ReadGSM());  //показываем ответ от GSM модуля
+
   if (!gprsSerial.available())  { 
     GSM_ON();
     //gprs_init();
