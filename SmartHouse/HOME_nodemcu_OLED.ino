@@ -154,6 +154,9 @@ void setup()
     ArduinoOTA.setHostname("BOILER-NodeMCU"); // Задаем имя сетевого порта    
 //  ArduinoOTA.setPassword((const char *)"0000"); // Задаем пароль доступа для удаленной прошивки   
     ArduinoOTA.begin(); // Инициализируем OTA
+
+    gprsSerial.begin(9600);  delay(50);
+    Serial.begin(9600);      delay(50);
     Wire.begin(SDA,SCL);
     delay(5);
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
@@ -190,29 +193,25 @@ void setup()
     Shifter.setRegisterPin(4, HIGH);
     EEPROM.begin(512);
     delay(10);
-    gprsSerial.begin(9600);
     clock.begin();
     myservo.attach(0);
     Read_Eprom();
     sensorsDS18B20.begin();
     sensorsDS18B20.requestTemperatures();
     UpdateTemp();
-    Serial.begin(9600);
 //  delay(50);
 //  Beep(780, 50);
-   MyWiFi();
-//   gprs_init();
+    MyWiFi();
     GSM_ON();
     Check_GSM();
     SendStatus();
+    gprs_init();
 //  fillHistory();
 //  clock.fillByYMD(2016,01,10);
 //  clock.fillByHMS(22,32,00);
 //  clock.setTime();
 //  EEPROM.write(addr_Auto_Temp, 24);
-    EnergySaveMode =  millis() + 15000; // самое время экономить жизнь OLED
-
- 
+    EnergySaveMode =  millis() + 15000; // самое время экономить жизнь OLED 
     timer.setInterval(500L, timerHalfSec);
 }
 
