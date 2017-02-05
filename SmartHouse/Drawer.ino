@@ -639,7 +639,7 @@ void DrawDash()
     display.setCursor(85, 52);
     display.print("4");
   }
-  if (!isRelay05)
+  if (isRelay05)
   {
     display.fillRect(97, 50, 12, 12, WHITE);
     display.setCursor(101, 52);
