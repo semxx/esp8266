@@ -48,11 +48,11 @@ OK
 
 void GSM_ON()   
 { 
-//  digitalWrite(Power_GSM_PIN, LOW);
+//  digitalWrite(Reset_GSM_PIN, LOW);
 //  delay(300);
-//  digitalWrite(Power_GSM_PIN, HIGH);
+//  digitalWrite(Reset_GSM_PIN, HIGH);
 //  delay(700);
-//  digitalWrite(Power_GSM_PIN, LOW);
+//  digitalWrite(Reset_GSM_PIN, LOW);
 
  gprsSerial.print(F("AT+CLTS=1\r")); // Разрешаем GSM модулю устанавливать локальное время сотового оператора   
  delay(50); // задержка на обработку команды
