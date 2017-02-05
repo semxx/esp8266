@@ -251,7 +251,8 @@ void Parse_Income_String()
         Last_Tel_Number=currStr.substring(8,8+12); 
         Ring();
         num_Screen=1;                                 // будим экран 
-        Next_Update_Screen_Saver =  millis() + 15000; // и апдейтим время включения скринсейвера
+        Next_Update_Screen_Saver =  millis() + 45000; // и апдейтим время включения скринсейвера
+        EnergySaveMode =  millis() + 45000;
       }
       else if (currStr.startsWith("NO CARRIER"))      // если текущая строка начинается NO CARRIER заначит бросили трубку 
       {
