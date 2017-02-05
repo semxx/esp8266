@@ -4,7 +4,7 @@
 #include <WiFiUdp.h>    
 #include <ArduinoOTA.h>          // Библиотека для OTA-прошивки
 #include <BlynkSimpleEsp8266.h>
-#include <SimpleTimer.h>         // Essential for all Blynk Projects
+#include <SimpleTimer.h>         //
 #include <OneWire.h>             //  Для DS18S20, DS18B20, DS1822 
 #include <DallasTemperature.h>   //  Для DS18S20, DS18B20, DS1822 
 #include <EEPROM.h>
@@ -13,36 +13,41 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>    // русификация шрифта  http://focuswitharduino.blogspot.ru/2015/03/lcd-nokia-5110.html
 #include <Servo.h> 
-#include <Shift595.h>
 #include <SoftwareSerial.h>
 
+#define OLED_RESET LED_BUILTIN    // просто заглушка, oled на i2c работает без подключения этого контакта
+#define Speaker        A0         // Динамик 
+#define Reset_GSM_PIN  D0         // GSM Shield при использовании GSM шилда
+#define R              D1         // Encoder Right
+#define L              D2         // Encoder Left
+#define servo_pin      D3         // Servo pin
+#define ONE_WIRE_BUS   1         // Линия датчиков DS18B20
+#define SDA            D5         // SDA   GPIO14
+#define SCL            D6         // SCL   GPIO12
+#define SW_TX          D4         // SoftwareSerial TX pin
+#define SW_RX          D7         // SoftwareSerial RX pin
+#define Encoder_SW     D8         // Кнопа смены статусных экранов 
+#define Relay_1        D10        // Реле 1 40A    привязан к датчику  Therm_1
+#define Relay_2        D10        // Реле 2 40A   
+#define Relay_3        D10        // Реле 3 10A    
+#define Relay_4        D10        // Реле 4 10A  
+#define Relay_5        D10        // Реле 5 10A  
+#define Relay_6        D10        // Реле 6 10A   
+/*
+// Подключаем сдвиговый регистр 74HC595
+//#include <Shift595.h>
+#define numOfRegisters 1                    // Указываем количество используемых сдвиговых регистров 74HC595
+int latchPin = 3;                           // Пин подключен к ST_CP входу 74HC595 (Оранжевый > 8)
+int clockPin = 1;                           // Пин подключен к SH_CP входу 74HC595  (Коричневый > 12)
+int dataPin = D10;                          // Пин подключен к DS входу 74HC595 (Белый > 11)
 
-#define OLED_RESET LED_BUILTIN   // просто заглушка, oled на i2c работает без подключения этого контакта
-#define Power_GSM_PIN  D0        // GSM Shield при использовании GSM шилда
-#define Reset_GSM_PIN            // GSM Shield при использовании GSM шилда
-
-#define SDA            D5        // SDA   GPIO14
-#define SCL            D6        // SCL   GPIO12
-
-#define Relay_1        D9        // Реле 1 40A    привязан к датчику  Therm_1
-#define Relay_2        D9        // Реле 2 40A   
-#define Relay_3        D9        // Реле 3 10A    
-#define Relay_4        D9        // Реле 4 10A  
-#define Relay_5        D9        // Реле 5 10A  
-#define Relay_6        D9        // Реле 6 10A   
-#define Speaker        A0        // Динамик 
-#define ONE_WIRE_BUS   D7        // Линия датчиков DS18B20
-#define btn_Right      D8        // Кнопа смены статусных экранов 
-#define ENCODER_ON               // Включить поддержку энкодера
-#define R              D9   //D1
-#define L              D9   //D2
-#define numOfRegisters 1         // Указываем количество используемых сдвиговых регистров 74HC595
-
+//Shift595 Shifter(dataPin, latchPin, clockPin, numOfRegisters);
+*/
 char auth[] = "4921ca8db3bc4cf6a84613ad405d9094";
 char ssid[] = "Xiaomi_2G";
 char pass[] = "panatorium";
 
-boolean isAutoHeating = true;      // Переменная принимает значение True, если включили автоподдержание температуры
+boolean isAutoHeating = false;      // Переменная принимает значение True, если включили автоподдержание температуры
 boolean isStringMessage = false;   // Переменная принимает значение True, если текущая строка является сообщением
 boolean isCalling = false;         // Переменная принимает значение True, если звонок
 boolean isRelay01 = false;         // Переменная принимает значение True, если реле включено
@@ -64,10 +69,6 @@ boolean plus1sec = false;          // ежесекундно взводится
 boolean PrintYesNo = false;        // показывать ли после времени Yes/No (косвенно - указание на режим установка/отображение)
 boolean BeepEnabled = true;
 static boolean rotating=false;     // debounce management
-
-int Hours = 0; // времянка часов RTC для отображения и установки
-int Minutes = 0; // времянка минут RTC для отображения и установки
-int Seconds;
 
 String ipString =        "";
 String currStr = "";               // переменная для чтения из сомпорта и счения смс и т.д.
@@ -107,10 +108,10 @@ int Floor_2_Temp = 0;     // Температура 2- й этаж
 int SaveHistoryHour = 0;  // переменная для хранения значения последнего часа записи значения тепрературы, что бы записывать раз в час
 int MenuItem = 0;
 int oldEncoderValue  = 0;
-// Подключаем сдвиговый регистр 74HC595
-int latchPin = 3;                           // Пин подключен к ST_CP входу 74HC595 (Оранжевый > 8)
-int clockPin = 1;                           // Пин подключен к SH_CP входу 74HC595  (Коричневый > 12)
-int dataPin = D9;                           // Пин подключен к DS входу 74HC595 (Белый > 11)
+int Hours = 0;            // времянка часов RTC для отображения и установки
+int Minutes = 0;          // времянка минут RTC для отображения и установки
+int Seconds;
+
 // Переменные для Encoder
 int  lastEncoded = 0;
 int  encoderValue = 0;
@@ -139,8 +140,8 @@ unsigned long Next_Update_Temp = 0;         // Время апдейта тем�
 unsigned long Next_Update_Screen_Saver = 0; // Время апдейта экрана
 unsigned long EnergySaveMode = 0;           // Время экономить жизнь экрана
 
-SoftwareSerial gprsSerial(D1, D2);            // установка контактов 1 и 3 для программного порта
-Shift595 Shifter(dataPin, latchPin, clockPin, numOfRegisters);
+SoftwareSerial gprsSerial(SW_RX, SW_TX);            // установка контактов 1 и 3 для программного порта
+
 Adafruit_SSD1306 display(OLED_RESET);
 //HardwareSerial & gprsSerial = Serial1;
 SimpleTimer timer;
@@ -156,7 +157,7 @@ void setup()
     ArduinoOTA.begin(); // Инициализируем OTA
 
     gprsSerial.begin(9600);  delay(50);
-    Serial.begin(9600);      delay(50);
+//    Serial.begin(9600);      delay(50);
     Wire.begin(SDA,SCL);
     delay(5);
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
@@ -164,8 +165,8 @@ void setup()
     delay(500);  // Clear the buffer.
     display.clearDisplay();                    // clears the screen and buffer
     Last_Tel_Number=First_Number;
-    pinMode(btn_Right, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
-    pinMode(Power_GSM_PIN, OUTPUT);
+    pinMode(Encoder_SW, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
+    pinMode(Reset_GSM_PIN, OUTPUT);
     pinMode(Relay_1, OUTPUT);
     pinMode(Relay_2, OUTPUT);
     pinMode(Relay_3, OUTPUT);
@@ -173,8 +174,8 @@ void setup()
     pinMode(Relay_5, OUTPUT);
     pinMode(Relay_6, OUTPUT);
     pinMode(Speaker, OUTPUT); //Set buzzerPin as output
-    digitalWrite(Speaker, HIGH);
-    digitalWrite(Power_GSM_PIN, HIGH);
+    //digitalWrite(Speaker, HIGH);
+    digitalWrite(Reset_GSM_PIN, HIGH);
     digitalWrite(Relay_1, LOW);
     digitalWrite(Relay_2, LOW);
     digitalWrite(Relay_3, LOW);
@@ -187,14 +188,16 @@ void setup()
     digitalWrite(L, HIGH);    //  turn pullup resistor on  
     attachInterrupt(digitalPinToInterrupt(R), handleInterrupt, CHANGE);
     attachInterrupt(digitalPinToInterrupt(L), handleInterrupt, CHANGE);
+/*
     Shifter.setRegisterPin(1, HIGH);
     Shifter.setRegisterPin(2, HIGH);
     Shifter.setRegisterPin(3, HIGH);
     Shifter.setRegisterPin(4, HIGH);
+*/
     EEPROM.begin(512);
     delay(10);
     clock.begin();
-    myservo.attach(0);
+    myservo.attach(servo_pin);
     Read_Eprom();
     sensorsDS18B20.begin();
     sensorsDS18B20.requestTemperatures();
@@ -205,7 +208,7 @@ void setup()
     GSM_ON();
     Check_GSM();
     SendStatus();
-    gprs_init();
+//    gprs_init();
 //  fillHistory();
 //  clock.fillByYMD(2016,01,10);
 //  clock.fillByHMS(22,32,00);
@@ -442,7 +445,7 @@ EEPROM.commit();
 
 void ReadButton()
 {
- int sensorVal = digitalRead(btn_Right);
+ int sensorVal = digitalRead(Encoder_SW);
     if (sensorVal == HIGH) {                        // переключение информационных экранов
         MenuTimeoutTimer = 10;                      //таймер таймаута, секунд
       if (num_Screen < max_Screen) {
@@ -577,7 +580,7 @@ void UpdateTemp()
     isRelay02 = false;
     isAutoHeating = false;
     sprintf(temp_msg, "out=%dC,main=%dC,floor_1=%dC,floor_2=%dC, time: %d:%d", Out_Temp, Main_Temp, Floor_1_Temp, Floor_2_Temp, clock.hour, clock.minute);
-//    SendTextMessage(Last_Tel_Number, F("ALARM TEMP. Floor REALAY OFF"), temp_msg);
+    SendTextMessage(Last_Tel_Number, F("ALARM TEMP. Floor REALAY OFF"), temp_msg);
   }
 
 }
@@ -620,6 +623,7 @@ void fillHistory() // Заполнить EEPROM временными данны�
     EEPROM.commit();
   }  
 }
+/*
 BLYNK_WRITE(1)
 {
   int a = param.asInt();
@@ -664,3 +668,4 @@ BLYNK_WRITE(1)
     Shifter.setRegisterPin(4, LOW);
     }
  }
+ */
