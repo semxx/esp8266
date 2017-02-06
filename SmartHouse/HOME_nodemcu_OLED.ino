@@ -21,7 +21,7 @@
 #define Reset_GSM_PIN  D0         // GSM Shield при использовании GSM шилда
 #define R              D1         // Encoder Right
 #define L              D2         // Encoder Left
-#define servo_pin      9          // Servo pin
+#define servo_pin      14         // Servo pin
 #define ONE_WIRE_BUS   1          // Линия датчиков DS18B20
 #define SDA            D5         // SDA   GPIO14
 #define SCL            D6         // SCL   GPIO12
@@ -156,20 +156,20 @@ void setup()
     ArduinoOTA.begin(); // Инициализируем OTA
 
     gprsSerial.begin(9600);  delay(50);
-    Serial.begin(9600);      delay(50);
+    Serial.begin(9600);    delay(50);
     Wire.begin(SDA,SCL);
     delay(5);
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
 //  display.display();                          // show splashscreen
     delay(500);  // Clear the buffer.
     display.clearDisplay();                    // clears the screen and buffer
-    
+//I2C_Wire();  
     while (! WireIO.begin()) {
     Serial.println(F("Cannot connect to slave device!"));
     delay(1000);
   }
     Last_Tel_Number=First_Number;  
-    WireIO.pinMode(servo_pin, OUTPUT);
+
     pinMode(Encoder_SW, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
     pinMode(Reset_GSM_PIN, OUTPUT);
     pinMode(Relay_1, OUTPUT);
@@ -228,6 +228,18 @@ String GetIpString (IPAddress ip) {
   return ipStr;
 }
 
+void I2C_Wire(){
+  ESP.wdtDisable();
+  int mytimeout = millis() / 1000;  
+  do {
+if (!WireIO.begin()) {
+    Serial.println(F("Cannot connect to slave device!"));
+    delay(1000);
+           }
+  }    
+    while (((millis() / 1000) > mytimeout + 3) || WireIO.begin()); 
+    WireIO.pinMode(servo_pin, OUTPUT);
+}
 void MyWiFi(){
   display.clearDisplay(); 
   //WiFi.disconnect();
@@ -358,7 +370,7 @@ if (gprsSerial.available()) {  //если GSM модуль что-то посл�
   if (currentTime > Next_Update_Draw) {         // время перерисовать экран
     ReadButton();
     UpdateDisplay();
-    WireIO.digitalWrite(servo_pin, encoderValue);
+    WireIO.analogWrite(servo_pin, encoderValue);
 //  WireIO.analogWrite(pinPwm, map(ldr, 0, 1023, 0, 255));
 //  myservo.write(encoderValue);
 //  delay(15);
