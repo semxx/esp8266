@@ -168,7 +168,8 @@ void setup()
     Serial.println(F("Cannot connect to slave device!"));
     delay(1000);
   }
-    Last_Tel_Number=First_Number;
+    Last_Tel_Number=First_Number;  
+    WireIO.pinMode(servo_pin, OUTPUT);
     pinMode(Encoder_SW, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
     pinMode(Reset_GSM_PIN, OUTPUT);
     pinMode(Relay_1, OUTPUT);
