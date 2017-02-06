@@ -9,10 +9,11 @@
 #include <DallasTemperature.h>   //  Для DS18S20, DS18B20, DS1822 
 #include <EEPROM.h>
 #include <Wire.h>                //  Для  DS1307
+#include <WireIO.h>              //  Расширяем порты с помощью Arduino PRO mini
 #include "DS1307.h"              //  Для  DS1307
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>    // русификация шрифта  http://focuswitharduino.blogspot.ru/2015/03/lcd-nokia-5110.html
-#include <Servo.h> 
+//#include <Servo.h> 
 #include <SoftwareSerial.h>
 
 #define OLED_RESET LED_BUILTIN    // просто заглушка, oled на i2c работает без подключения этого контакта
@@ -20,8 +21,8 @@
 #define Reset_GSM_PIN  D0         // GSM Shield при использовании GSM шилда
 #define R              D1         // Encoder Right
 #define L              D2         // Encoder Left
-#define servo_pin      D3         // Servo pin
-#define ONE_WIRE_BUS   1         // Линия датчиков DS18B20
+#define servo_pin      9          // Servo pin
+#define ONE_WIRE_BUS   1          // Линия датчиков DS18B20
 #define SDA            D5         // SDA   GPIO14
 #define SCL            D6         // SCL   GPIO12
 #define SW_TX          D4         // SoftwareSerial TX pin
@@ -140,15 +141,13 @@ unsigned long Next_Update_Temp = 0;         // Время апдейта тем�
 unsigned long Next_Update_Screen_Saver = 0; // Время апдейта экрана
 unsigned long EnergySaveMode = 0;           // Время экономить жизнь экрана
 
-SoftwareSerial gprsSerial(SW_RX, SW_TX);            // установка контактов 1 и 3 для программного порта
-
+SoftwareSerial gprsSerial(SW_RX, SW_TX);    // установка контактов 1 и 3 для программного порта
 Adafruit_SSD1306 display(OLED_RESET);
-//HardwareSerial & gprsSerial = Serial1;
 SimpleTimer timer;
 DS1307 clock;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensorsDS18B20(&oneWire);
-Servo myservo;                              // create servo object to control a servo 
+//Servo myservo;                              // create servo object to control a servo 
 
 void setup()
 {
@@ -157,13 +156,18 @@ void setup()
     ArduinoOTA.begin(); // Инициализируем OTA
 
     gprsSerial.begin(9600);  delay(50);
-//    Serial.begin(9600);      delay(50);
+    Serial.begin(9600);      delay(50);
     Wire.begin(SDA,SCL);
     delay(5);
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
 //  display.display();                          // show splashscreen
     delay(500);  // Clear the buffer.
     display.clearDisplay();                    // clears the screen and buffer
+    
+    while (! WireIO.begin()) {
+    Serial.println(F("Cannot connect to slave device!"));
+    delay(1000);
+  }
     Last_Tel_Number=First_Number;
     pinMode(Encoder_SW, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
     pinMode(Reset_GSM_PIN, OUTPUT);
@@ -197,7 +201,7 @@ void setup()
     EEPROM.begin(512);
     delay(10);
     clock.begin();
-    myservo.attach(servo_pin);
+//    myservo.attach(servo_pin);
     Read_Eprom();
     sensorsDS18B20.begin();
     sensorsDS18B20.requestTemperatures();
@@ -353,8 +357,10 @@ if (gprsSerial.available()) {  //если GSM модуль что-то посл�
   if (currentTime > Next_Update_Draw) {         // время перерисовать экран
     ReadButton();
     UpdateDisplay();
-    myservo.write(encoderValue);
-   // delay(15);
+    WireIO.digitalWrite(servo_pin, encoderValue);
+//  WireIO.analogWrite(pinPwm, map(ldr, 0, 1023, 0, 255));
+//  myservo.write(encoderValue);
+//  delay(15);
     Next_Update_Draw =  millis() + 100;         // отсчитываем по 0,2 секунды
   }
 
