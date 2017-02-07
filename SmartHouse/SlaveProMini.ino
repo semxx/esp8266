@@ -8,7 +8,7 @@
 #endif
 
 Servo myservo;                              // create servo object to control a servo 
-
+int8_t encoderValue = 0;
 volatile command_t _cmd = NONE;
 volatile int8_t _pin = -1;
 
@@ -40,6 +40,7 @@ void receiveEvent(int numBytes) {
   }
   while (Wire.available()) {
     uint8_t in = Wire.read();
+
 #ifdef SERIALDEBUG
     Serial.print(F("IN: "));
     Serial.println(in);
@@ -65,9 +66,14 @@ void receiveEvent(int numBytes) {
         } else {
           if (in & cmdDigitalAnalog)
             _cmd = ANALOGREAD;
+ 
           else
             _cmd = DIGITALREAD;
         }
+        if (in & cmdSendValue)
+        {
+         _cmd = SENDVALUE;
+          }
       }
 #ifdef SERIALDEBUG
       Serial.print(F("Pin: "));
@@ -90,8 +96,13 @@ void receiveEvent(int numBytes) {
           Serial.println(F("AnalogWrite"));
           break;
       }
+
 #endif
     }
+    else {
+     _cmd = SENDVALUE;
+      }
+           Serial.println(_cmd);
     if (_cmd == PINMODE) {
 #ifdef SERIALDEBUG
       Serial.print(F("pinMode("));
@@ -151,10 +162,25 @@ void receiveEvent(int numBytes) {
 #endif
         eventComplete();
       }
+      else if (_cmd == SENDVALUE) {
+      if (Wire.available()) {
+        in = Wire.read();
+#ifdef SERIALDEBUG
+        Serial.print(F("IN: "));
+        Serial.println(in);
+#endif
+        
+#ifdef SERIALDEBUG
+        Serial.print(F("sendValue("));
+        Serial.print(in);
+        Serial.println(F(")"));
+#endif
+        eventComplete();
+      }
     }
   }
 }
-
+}
 void requestEvent() {
 #ifdef POWERSAVE
   timeToSleep = millis() + idleTimeout;
@@ -227,7 +253,6 @@ myservo.attach(7);
 
 void loop() {
 
-int encoderValue = analogRead(14);
 Serial.println(encoderValue);
 myservo.write(encoderValue);
 delay(500);
