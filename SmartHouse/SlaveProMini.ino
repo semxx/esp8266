@@ -41,6 +41,9 @@ void receiveEvent(int numBytes) {
   while (Wire.available()) {
     uint8_t in = Wire.read();
 
+if (in & cmdSendValue) {
+        _cmd = SENDVALUE;
+      }
 #ifdef SERIALDEBUG
     Serial.print(F("IN: "));
     Serial.println(in);
@@ -55,6 +58,7 @@ void receiveEvent(int numBytes) {
         _pin = -1;
         return;
       }
+
       if (in & cmdMode) {
         _cmd = PINMODE;
       } else {
@@ -99,10 +103,7 @@ void receiveEvent(int numBytes) {
 
 #endif
     }
-    else {
-     _cmd = SENDVALUE;
-      }
-           Serial.println(_cmd);
+Serial.print(_cmd);
     if (_cmd == PINMODE) {
 #ifdef SERIALDEBUG
       Serial.print(F("pinMode("));
