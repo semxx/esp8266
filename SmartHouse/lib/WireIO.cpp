@@ -147,10 +147,10 @@ void _WireIO::analogWrite(uint8_t pin, uint8_t value) {
   Wire.endTransmission();
 }
 
-void _WireIO::sendValue(uint8_t value) {
-  uint8_t pin = 0;
+void _WireIO::sendValue(uint16_t value) {
+//  uint8_t pin = 0;
   uint16_t data = cmdSendValue;
-  data |= (pin << 3);
+ // data |= (cmdSendValue << 3);
   Wire.beginTransmission(slaveAddress);
   Wire.write(data);
   Wire.write(value);
