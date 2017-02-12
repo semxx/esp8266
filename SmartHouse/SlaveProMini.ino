@@ -1,13 +1,11 @@
+
 #define SERIALDEBUG
-#include <Servo.h> 
+
 #include <Wire.h>
 #include "WireIO_defs.h"
 #ifdef POWERSAVE
 #include <avr/sleep.h>
 #endif
-
-Servo myservo;                              // create servo object to control a servo 
-int16_t encoderValue = 0;
 
 volatile command_t _cmd = NONE;
 volatile int8_t _pin = -1;
@@ -39,20 +37,23 @@ void receiveEvent(int numBytes) {
     return;
   }
   while (Wire.available()) {
-    uint8_t in = Wire.read();
+    uint16_t in = Wire.read();
+
 #ifdef SERIALDEBUG
-   // Serial.print(F("IN: "));
-  //  Serial.println(in);
+    Serial.print(F("IN: "));
+    Serial.println(in);
+    Serial.println(in, BIN);
 #endif
-  //    if (in & cmdSendValue) {
-  //       _cmd = SENDVALUE;
-  //      Serial.println(_cmd);
-  //      }
+if (in == cmdSendValue) {
+Serial.print(F("SendValue Recieved... "));
+eventComplete();
+return;
+}
     if (_cmd == NONE) {
       _pin = in >> 3;
       if ((_pin > lastPin) || (_pin == sdaPin) || (_pin == sclPin)) { // Illegal or used for I2C pin
 #ifdef SERIALDEBUG
-        Serial.print(F("Illegal pin: "));
+        // Serial.print(F("Illegal pin: "));
         Serial.println(_pin);
 #endif
         _pin = -1;
@@ -73,7 +74,6 @@ void receiveEvent(int numBytes) {
             _cmd = DIGITALREAD;
         }
       }
-
 #ifdef SERIALDEBUG
       Serial.print(F("Pin: "));
       Serial.println(_pin);
@@ -94,13 +94,10 @@ void receiveEvent(int numBytes) {
         case ANALOGWRITE:
           Serial.println(F("AnalogWrite"));
           break;
-        case SENDVALUE:
-          Serial.println(F("SENDVALUE"));
-          break;
       }
 #endif
     }
-    if (_cmd == PINMODE && _cmd == SENDVALUE) {
+    if (_cmd == PINMODE) {
 #ifdef SERIALDEBUG
       Serial.print(F("pinMode("));
       Serial.print(_pin);
@@ -149,34 +146,11 @@ void receiveEvent(int numBytes) {
         Serial.print(F("IN: "));
         Serial.println(in);
 #endif
-if (_pin != 0) {
         analogWrite(_pin, in);
-}
-else {
-  encoderValue = in;
-  }
 #ifdef SERIALDEBUG
         Serial.print(F("analogWrite("));
         Serial.print(_pin);
         Serial.print(F(", "));
-        Serial.print(in);
-        Serial.println(F(")"));
-#endif
-        eventComplete();
-      }
-    }
-else if (_cmd == SENDVALUE) {
-      if (Wire.available()) {
-        in = Wire.read();
-#ifdef SERIALDEBUG
-        Serial.print(F("IN: "));
-        Serial.println(in);
-#endif
-        analogWrite(_pin, in);
-#ifdef SERIALDEBUG
-        Serial.print(F("sendValue("));
-       // Serial.print(_pin);
-      //  Serial.print(F(", "));
         Serial.print(in);
         Serial.println(F(")"));
 #endif
@@ -252,16 +226,9 @@ void setup() {
 #ifdef POWERSAVE
   timeToSleep = millis() + idleTimeout;
 #endif
-myservo.attach(7);
 }
 
 void loop() {
-
-Serial.println(encoderValue);
-myservo.write(encoderValue);
-delay(500);
-
-  
 #ifdef POWERSAVE
   if (millis() > timeToSleep) {
 #ifdef SERIALDEBUG
