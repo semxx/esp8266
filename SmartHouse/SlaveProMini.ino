@@ -1,4 +1,32 @@
+/*#include <Wire.h>
+#define ADDRESS     0x01
 
+uint8_t  data[8];
+
+void setup() 
+{
+	Serial.begin(9600); 
+	Wire.begin(ADDRESS);
+    Wire.onReceive(receiveEvent); // register event
+}
+
+void loop() 
+{}
+
+void receiveEvent(int numBytes)
+{  
+   while(Wire.available())
+    {
+    for(int i=0;i<8;i++)
+	{
+	data[i] = Wire.read();	
+	Serial.println(data[i],DEC); 	
+	}
+		
+    }
+Wire1.requestFrom(0x68, 1);
+}
+*/
 #define SERIALDEBUG
 
 #include <Wire.h>
