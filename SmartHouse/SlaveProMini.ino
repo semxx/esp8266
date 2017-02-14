@@ -1,50 +1,51 @@
-/*#include <Wire.h>
-#define ADDRESS     0x01
-
-uint8_t  data[8];
-
-void setup() 
-{
-	Serial.begin(9600); 
-	Wire.begin(ADDRESS);
-    Wire.onReceive(receiveEvent); // register event
-}
-
-void loop() 
-{}
-
-void receiveEvent(int numBytes)
-{  
-   while(Wire.available())
-    {
-    for(int i=0;i<8;i++)
-	{
-	data[i] = Wire.read();	
-	Serial.println(data[i],DEC); 	
-	}
-		
-    }
-Wire1.requestFrom(0x68, 1);
-}
-*/
 #define SERIALDEBUG
-
+#include <Servo.h> 
 #include <Wire.h>
 #include "WireIO_defs.h"
 #ifdef POWERSAVE
 #include <avr/sleep.h>
 #endif
 
-volatile command_t _cmd = NONE;
+#define BeepPin     11 // пищалка
+#define BeepToneNo  2000 // тон звука "No", герц
+#define BeepToneYes 4000 // тон звука "Yes", герц
+#define BeepToneNoDuration 200 // длительность звука "No", мс
+#define BeepToneYesDuration 200 // длительность звука "Yes", мс
+
+Servo myservo;                              // create servo object to control a servo 
+int16_t encoderValue = 0;
+
+volatile command_t _cmd = UNKNOWN;
+volatile int8_t _params = 0;
 volatile int8_t _pin = -1;
 
 #ifdef POWERSAVE
 volatile uint32_t timeToSleep = 0;
 #endif
 
-inline void eventComplete() {
-  _cmd = NONE;
+void resetEvent() {
+  _cmd = UNKNOWN;
+  _params = 0;
   _pin = -1;
+}
+
+command_t decodeCmd(uint8_t data) {
+  command_t result = UNKNOWN;
+
+  if (((data >> 4) ^ 0x0F) == (data & 0x0F)) {
+    result = (command_t)(data & 0x0F);
+    if (result > UNKNOWN)
+      result = UNKNOWN;
+  }
+
+  return result;
+}
+
+int8_t decodePin(uint8_t data) {
+  if ((data > lastPin) || (data == sdaPin) || (data == sclPin)) // Illegal or used for I2C pin
+    return -1;
+  else
+    return data;
 }
 
 void receiveEvent(int numBytes) {
@@ -57,133 +58,148 @@ void receiveEvent(int numBytes) {
   Serial.println(F(")"));
 #endif
   if (numBytes == 0) {
-    _cmd = NONE;
-    _pin = -1;
+    resetEvent();
 #ifdef SERIALDEBUG
     Serial.println(F("Address check"));
 #endif
     return;
   }
-  while (Wire.available()) {
-    uint16_t in = Wire.read();
 
+  uint8_t in;
+
+  while (Wire.available()) {
+    if (_cmd == UNKNOWN) {
+      do {
+        if (! Wire.available())
+          return;
+        in = Wire.read();
 #ifdef SERIALDEBUG
-    Serial.print(F("IN: "));
-    Serial.println(in);
-    Serial.println(in, BIN);
+        Serial.print(F("IN: "));
+        Serial.println(in);
 #endif
-if (in == cmdSendValue) {
-Serial.print(F("SendValue Recieved... "));
-eventComplete();
-return;
-}
-    if (_cmd == NONE) {
-      _pin = in >> 3;
-      if ((_pin > lastPin) || (_pin == sdaPin) || (_pin == sclPin)) { // Illegal or used for I2C pin
+        _cmd = decodeCmd(in);
+      } while (_cmd == UNKNOWN);
+      _pin = -1;
+      if (_cmd <= ANALOGREAD)
+        _params = 1;
+      else if (_cmd <= ANALOGWRITE)
+        _params = 2;
 #ifdef SERIALDEBUG
-        // Serial.print(F("Illegal pin: "));
-        Serial.println(_pin);
-#endif
-        _pin = -1;
-        return;
-      }
-      if (in & cmdMode) {
-        _cmd = PINMODE;
-      } else {
-        if (in & cmdReadWrite) {
-          if (in & cmdDigitalAnalog)
-            _cmd = ANALOGWRITE;
-          else
-            _cmd = DIGITALWRITE;
-        } else {
-          if (in & cmdDigitalAnalog)
-            _cmd = ANALOGREAD;
-          else
-            _cmd = DIGITALREAD;
-        }
-      }
-#ifdef SERIALDEBUG
-      Serial.print(F("Pin: "));
-      Serial.println(_pin);
       Serial.print(F("Command: "));
       switch (_cmd) {
-        case PINMODE:
+        case PINMODEINPUT:
+        case PINMODEINPUTPU:
+        case PINMODEOUTPUT:
           Serial.println(F("pinMode"));
           break;
         case DIGITALREAD:
           Serial.println(F("digitalRead"));
           break;
         case ANALOGREAD:
-          Serial.println(F("AnalogRead"));
+          Serial.println(F("analogRead"));
           break;
         case DIGITALWRITE:
-          Serial.println(F("DigitalWrite"));
+          Serial.println(F("digitalWrite"));
           break;
         case ANALOGWRITE:
-          Serial.println(F("AnalogWrite"));
+          Serial.println(F("analogWrite"));
           break;
       }
 #endif
     }
-    if (_cmd == PINMODE) {
+
+    if (Wire.available() < _params)
+      return;
+
+    if (_cmd <= ANALOGWRITE) { // Read pin
+      in = Wire.read();
+      --_params;
+#ifdef SERIALDEBUG
+      Serial.print(F("IN: "));
+      Serial.println(in);
+#endif
+      _pin = decodePin(in);
+      if (_pin == -1) {
+#ifdef SERIALDEBUG
+        Serial.print(F("Illegal pin: "));
+        Serial.println(in);
+#endif
+        while (_params) { // Flush remain data
+          Wire.read();
+          --_params;
+        }
+        resetEvent();
+        return;
+      }
+    }
+
+    if ((_cmd >= PINMODEINPUT) && (_cmd <= PINMODEOUTPUT)) {
 #ifdef SERIALDEBUG
       Serial.print(F("pinMode("));
       Serial.print(_pin);
       Serial.print(F(", "));
 #endif
-      if (in & cmdReadWrite) { // 0 - input, 1 - output
+      if (_cmd == PINMODEINPUT) {
+        pinMode(_pin, INPUT);
+#ifdef SERIALDEBUG
+        Serial.println(F("INPUT)"));
+#endif
+      } else if (_cmd == PINMODEINPUTPU) {
+        pinMode(_pin, INPUT_PULLUP);
+#ifdef SERIALDEBUG
+        Serial.println(F("INPUT_PULLUP)"));
+#endif
+      } else {
         pinMode(_pin, OUTPUT);
 #ifdef SERIALDEBUG
         Serial.println(F("OUTPUT)"));
 #endif
-      } else {
-        if (in & cmdDigitalAnalog) { // 1 - pullup
-          pinMode(_pin, INPUT_PULLUP);
-#ifdef SERIALDEBUG
-          Serial.println(F("INPUT_PULLUP)"));
-#endif
-        } else {
-          pinMode(_pin, INPUT);
-#ifdef SERIALDEBUG
-          Serial.println(F("INPUT)"));
-#endif
-        }
       }
-      eventComplete();
+      resetEvent();
     } else if (_cmd == DIGITALWRITE) {
-      if (Wire.available()) {
-        in = Wire.read();
+      in = Wire.read();
+      --_params;
 #ifdef SERIALDEBUG
-        Serial.print(F("IN: "));
-        Serial.println(in);
+      Serial.print(F("IN: "));
+      Serial.println(in);
 #endif
-        digitalWrite(_pin, in);
+      digitalWrite(_pin, in);
 #ifdef SERIALDEBUG
-        Serial.print(F("digitalWrite("));
-        Serial.print(_pin);
-        Serial.print(F(", "));
-        Serial.print(in);
-        Serial.println(F(")"));
+      Serial.print(F("digitalWrite("));
+      Serial.print(_pin);
+      Serial.print(F(", "));
+      Serial.print(in);
+      Serial.println(F(")"));
 #endif
-        eventComplete();
-      }
+      resetEvent();
     } else if (_cmd == ANALOGWRITE) {
-      if (Wire.available()) {
-        in = Wire.read();
+      in = Wire.read();
+      --_params;
 #ifdef SERIALDEBUG
-        Serial.print(F("IN: "));
-        Serial.println(in);
+      Serial.print(F("IN: "));
+      Serial.println(in);
 #endif
-        analogWrite(_pin, in);
+////////////////////////////////////////////////////////////
+      if (_pin == 22) {
+       encoderValue = in; 
+        }
+      else 
+       
+       if (_pin == 23) {
+       tone(BeepPin,5000,10);
+        } 
+        else {
+      analogWrite(_pin, in);
+        }
+      
 #ifdef SERIALDEBUG
-        Serial.print(F("analogWrite("));
-        Serial.print(_pin);
-        Serial.print(F(", "));
-        Serial.print(in);
-        Serial.println(F(")"));
+      Serial.print(F("analogWrite("));
+      Serial.print(_pin);
+      Serial.print(F(", "));
+      Serial.print(in);
+      Serial.println(F(")"));
 #endif
-        eventComplete();
-      }
+      resetEvent();
     }
   }
 }
@@ -195,19 +211,18 @@ void requestEvent() {
 #ifdef SERIALDEBUG
   Serial.println(F("Wire.onRequest"));
 #endif
-  if ((_cmd != DIGITALREAD) && (_cmd != ANALOGREAD)) {
-    _cmd = NONE;
-    _pin = -1;
+  if (_cmd == UNKNOWN) {
 #ifdef SERIALDEBUG
-    Serial.println(F("Illegal command!"));
+    Serial.println(F("Unspecified command!"));
 #endif
+    resetEvent();
     return;
   }
-  if (_pin == -1) {
-    _cmd = NONE;
+  if ((_cmd <= ANALOGWRITE) && (_pin == -1)) {
 #ifdef SERIALDEBUG
-    Serial.println(F("Illegal pin!"));
+    Serial.println(F("Unspecified pin!"));
 #endif
+    resetEvent();
     return;
   }
   if (_cmd == DIGITALREAD) {
@@ -219,7 +234,7 @@ void requestEvent() {
     Serial.print(F(") = "));
     Serial.println(val);
 #endif
-    eventComplete();
+    resetEvent();
   } else if (_cmd == ANALOGREAD) {
     int16_t val = analogRead(_pin);
     Wire.write(val >> 8);
@@ -230,7 +245,7 @@ void requestEvent() {
     Serial.print(F(") = "));
     Serial.print(val);
 #endif
-    eventComplete();
+    resetEvent();
   }
 }
 
@@ -254,9 +269,13 @@ void setup() {
 #ifdef POWERSAVE
   timeToSleep = millis() + idleTimeout;
 #endif
+myservo.attach(7);
 }
 
 void loop() {
+
+myservo.write(encoderValue);
+  
 #ifdef POWERSAVE
   if (millis() > timeToSleep) {
 #ifdef SERIALDEBUG
@@ -286,8 +305,7 @@ void loop() {
 #ifdef SERIALDEBUG
     Serial.println(F("Waked up"));
 #endif
-    _cmd = NONE;
-    _pin = -1;
+    resetEvent();
     timeToSleep = millis() + idleTimeout;
   }
 #endif
