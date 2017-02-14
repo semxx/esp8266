@@ -17,12 +17,12 @@
 #include <SoftwareSerial.h>
 
 #define OLED_RESET LED_BUILTIN    // просто заглушка, oled на i2c работает без подключения этого контакта
-#define Speaker        A0         // Динамик 
+#define Speaker        A0          // Динамик 
 #define Reset_GSM_PIN  D0         // GSM Shield при использовании GSM шилда
 #define R              D1         // Encoder Right
 #define L              D2         // Encoder Left
 #define servo_pin      14         // Servo pin
-#define ONE_WIRE_BUS   1          // Линия датчиков DS18B20
+#define ONE_WIRE_BUS   D3         // Линия датчиков DS18B20
 #define SDA            D5         // SDA   GPIO14
 #define SCL            D6         // SCL   GPIO12
 #define SW_TX          D4         // SoftwareSerial TX pin
@@ -208,7 +208,7 @@ void setup()
     sensorsDS18B20.requestTemperatures();
     UpdateTemp();
 //  delay(50);
-//  Beep(780, 50);
+    Beep(780, 50);
     MyWiFi();
     GSM_ON();
     Check_GSM();
@@ -370,7 +370,7 @@ if (gprsSerial.available()) {  //если GSM модуль что-то посл�
   if (currentTime > Next_Update_Draw) {         // время перерисовать экран
     ReadButton();
     UpdateDisplay();
-    WireIO.analogWrite(servo_pin, encoderValue);
+  //  WireIO.sendValue(encoderValue);
 //  WireIO.analogWrite(pinPwm, map(ldr, 0, 1023, 0, 255));
 //  myservo.write(encoderValue);
 //  delay(15);
@@ -434,6 +434,7 @@ void Buzzer(unsigned char delayms)
 
 void Beep(word frq, word dur)
 {
+    WireIO.analogWrite(23,encoderValue);
     int noteDuration = 1000 / dur;
     tone(Speaker, frq, noteDuration);
     int pauseBetweenNotes = noteDuration * 1.30;
@@ -464,8 +465,10 @@ EEPROM.commit();
 
 void ReadButton()
 {
+  
  int sensorVal = digitalRead(Encoder_SW);
     if (sensorVal == HIGH) {                        // переключение информационных экранов
+        Beep(626, 150);
         MenuTimeoutTimer = 10;                      //таймер таймаута, секунд
       if (num_Screen < max_Screen) {
         num_Screen++;
@@ -642,16 +645,16 @@ void fillHistory() // Заполнить EEPROM временными данны�
     EEPROM.commit();
   }  
 }
-/*
+
 BLYNK_WRITE(1)
 {
   int a = param.asInt();
   if (a == 0)
   {
-    Shifter.setRegisterPin(1, HIGH);
+    WireIO.digitalWrite(13, HIGH);
   } else
     {
-    Shifter.setRegisterPin(1, LOW);
+    WireIO.digitalWrite(13, LOW);
     }
  }
  BLYNK_WRITE(2)
@@ -659,32 +662,33 @@ BLYNK_WRITE(1)
   int a = param.asInt();
   if (a == 0)
   {
-    Shifter.setRegisterPin(2, HIGH);
-  } else
-    {
-    Shifter.setRegisterPin(2, LOW);
-    }
+     WireIO.analogWrite(22,encoderValue);
+  } 
  }
   BLYNK_WRITE(3)
 {
   int a = param.asInt();
   if (a == 0)
   {
-    Shifter.setRegisterPin(3, HIGH);
-  } else
-    {
-    Shifter.setRegisterPin(3, LOW);
-    }
- }
+    WireIO.digitalRead(13);
+  }
+} 
    BLYNK_WRITE(4)
 {
   int a = param.asInt();
   if (a == 0)
   {
-    Shifter.setRegisterPin(4, HIGH);
+    WireIO.analogRead(0);
+  } 
+ }
+   BLYNK_WRITE(8)
+{
+  int a = param.asInt();
+  if (a == 0)
+  {
+    WireIO.analogWrite(0, 255);
   } else
     {
-    Shifter.setRegisterPin(4, LOW);
+    WireIO.analogWrite(0, 0);
     }
  }
- */
