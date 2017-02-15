@@ -160,22 +160,18 @@ DallasTemperature sensorsDS18B20(&oneWire);
 void setup()
 {
     gprsSerial.begin(9600);  delay(50);
-    Serial.begin(9600);    delay(50);
+    Serial.begin(115200);    delay(50);
     Wire.begin(SDA,SCL);
     delay(5);
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
 //  display.display();                          // show splashscreen
     delay(500);  // Clear the buffer.
     display.clearDisplay();                    // clears the screen and buffer
-//I2C_Wire();  
-    while (! WireIO.begin()) {
-    Serial.println(F("Cannot connect to slave device!"));
-    delay(1000);
-  }
+    WireIO.begin();
+    delay(500);
     Last_Tel_Number=First_Number;  
-
     pinMode(Encoder_SW, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
-    pinMode(Reset_GSM_PIN, OUTPUT);
+    //pinMode(Reset_GSM_PIN, OUTPUT);
     digitalWrite(Reset_GSM_PIN, HIGH);
     WireIO.digitalWrite(Relay_1, LOW);
     WireIO.digitalWrite(Relay_2, LOW);
@@ -228,16 +224,22 @@ String GetIpString (IPAddress ip) {
 }
 
 void I2C_Wire(){
-  ESP.wdtDisable();
-  int mytimeout = millis() / 1000;  
-  do {
-if (!WireIO.begin()) {
+//  ESP.wdtDisable();
+  int mytimeout = millis() / 1000;
+  int x = 0;
+  
+ while (!WireIO.begin()) {
+//    delay(500);
+    MyPrint(F("   I2C"),         1 * 6 - 6,  1 * 8 - 8, 2, 1);
+    MyPrint(F("Connecting"),     1 * 6 - 6,  4 * 8 - 8, 2, 1);
+    MyPrint(F("_"),          1 + x * 6 - 6,  6 * 8 - 8, 2, 1);
+    display.display();
     Serial.println(F("Cannot connect to slave device!"));
-    delay(1000);
-           }
-  }    
-    while (((millis() / 1000) > mytimeout + 3) || WireIO.begin()); 
-    WireIO.pinMode(servo_pin, OUTPUT);
+    if((millis() / 1000) > mytimeout + 4){ // try for less than 5 seconds to connect to WiFi router
+      display.clearDisplay(); 
+      break;
+    }
+}
 }
 void MyWiFi(){
   display.clearDisplay(); 
@@ -343,6 +345,7 @@ void loop()
       Parse_Income_String();                   // конец строки начинаем ее разбор
     }
   }
+
 /*  
 if (gprsSerial.available()) {  //если GSM модуль что-то послал нам, то
     Serial.println(ReadGSM());  //печатаем в монитор порта пришедшую строку
@@ -479,7 +482,6 @@ void ReadButton()
       }
       Next_Update_Screen_Saver =  millis() + 30000; // время для включения скринсейвера
       EnergySaveMode =  millis() + 45000;           // время экономить жизнь OLED
-      Beep(500, 20);
     }
 }
 
