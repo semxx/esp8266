@@ -2,38 +2,46 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>    
 #include <WiFiUdp.h>    
-#include <ArduinoOTA.h>          // Библиотека для OTA-прошивки
+#include <ArduinoOTA.h>           // Библиотека для OTA-прошивки
 #include <BlynkSimpleEsp8266.h>
-#include <SimpleTimer.h>         //
-#include <OneWire.h>             //  Для DS18S20, DS18B20, DS1822 
-#include <DallasTemperature.h>   //  Для DS18S20, DS18B20, DS1822 
+#include <SimpleTimer.h>
+#include <OneWire.h>              //  Для DS18S20, DS18B20, DS1822 
+#include <DallasTemperature.h>    //  Для DS18S20, DS18B20, DS1822 
 #include <EEPROM.h>
-#include <Wire.h>                //  Для  DS1307
-#include <WireIO.h>              //  Расширяем порты с помощью Arduino PRO mini
-#include "DS1307.h"              //  Для  DS1307
+#include <Wire.h>                 //  Для  DS1307
+#include <WireIO.h>               //  Расширяем порты с помощью Arduino PRO mini
+#include "DS1307.h"               //  Для  DS1307
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>    // русификация шрифта  http://focuswitharduino.blogspot.ru/2015/03/lcd-nokia-5110.html
-//#include <Servo.h> 
+#include <Adafruit_SSD1306.h>     // русcификация шрифта http://focuswitharduino.blogspot.ru/2015/03/lcd-nokia-5110.html
 #include <SoftwareSerial.h>
 
-#define OLED_RESET LED_BUILTIN    // просто заглушка, oled на i2c работает без подключения этого контакта
-#define Speaker        A0          // Динамик 
-#define Reset_GSM_PIN  D0         // GSM Shield при использовании GSM шилда
-#define R              D1         // Encoder Right
-#define L              D2         // Encoder Left
-#define servo_pin      14         // Servo pin
-#define ONE_WIRE_BUS   D3         // Линия датчиков DS18B20
-#define SDA            D5         // SDA   GPIO14
-#define SCL            D6         // SCL   GPIO12
-#define SW_TX          D4         // SoftwareSerial TX pin
-#define SW_RX          D7         // SoftwareSerial RX pin
-#define Encoder_SW     D8         // Кнопа смены статусных экранов 
-#define Relay_1        D10        // Реле 1 40A    привязан к датчику  Therm_1
-#define Relay_2        D10        // Реле 2 40A   
-#define Relay_3        D10        // Реле 3 10A    
-#define Relay_4        D10        // Реле 4 10A  
-#define Relay_5        D10        // Реле 5 10A  
-#define Relay_6        D10        // Реле 6 10A   
+// Распиновка на NodeMCU as Master (I2C)
+#define OLED_RESET LED_BUILTIN    //  просто заглушка, oled на i2c работает без подключения этого контакта
+#define Speaker        A0         //  Динамик 
+#define R              D1         //  Encoder Right
+#define L              D2         //  Encoder Left
+#define ONE_WIRE_BUS   D3         //  Линия датчиков DS18B20
+#define SDA            D5         //  SDA   GPIO14
+#define SCL            D6         //  SCL   GPIO12
+#define SW_TX          D4         //  SoftwareSerial TX pin
+#define SW_RX          D7         //  SoftwareSerial RX pin
+#define Encoder_SW     D8         //  Кнопа смены статусных экранов 
+
+//Распиновка на Arduino Pro Micro as Slave (I2C) https://giltesa.com/wp-content/uploads/2014/02/arduino-pinouts.jpg
+#define Relay_1        2          //  Реле 1 40A ТЭН котла 2 кВт
+#define Relay_2        3          //  Реле 2 40A ТЭН котла 4 кВт
+#define Relay_3        4          //  Реле 3 10A Циркуляционный насос системы отопления
+#define Relay_4        5          //  Реле 4 10A Греющий кабель системы отопления
+#define Relay_5        6          //  Реле 5 20A Инфракрасный обогреватель
+#define Relay_6        7          //  Реле 6 20A Насос водоснабжения
+#define ServoReserved  8          //  Зарезервировано под серво-привод для котла
+#define Movement_1     9          //  Датчик движения внутри котельной включает свет и экран
+#define Movement_Out_1 10         //  Датчик движения веранда
+#define Movement_Out_2 11         //  Датчик движения ворота
+#define WaterControl   14         //  A0 Датчик протечки воды
+#define Reset_GSM_PIN  15         //  A1 Рестарт GSM-модуля если нет ответа по команде AT
+
+
 /*
 // Подключаем сдвиговый регистр 74HC595
 //#include <Shift595.h>
@@ -48,7 +56,7 @@ char auth[] = "4921ca8db3bc4cf6a84613ad405d9094";
 char ssid[] = "Xiaomi_2G";
 char pass[] = "panatorium";
 
-boolean isAutoHeating = false;      // Переменная принимает значение True, если включили автоподдержание температуры
+boolean isAutoHeating = false;     // Переменная принимает значение True, если включили автоподдержание температуры
 boolean isStringMessage = false;   // Переменная принимает значение True, если текущая строка является сообщением
 boolean isCalling = false;         // Переменная принимает значение True, если звонок
 boolean isRelay01 = false;         // Переменная принимает значение True, если реле включено
@@ -94,13 +102,14 @@ byte sgsm = 0;                     // Переменная хранит уров
 #endif
 
 #ifdef dacha
-  byte Board_Therm[8] = {0x28,0xFF,0x1C,0xEE,0x87,0x16,0x03,0xF5};   // 
-  byte Out_Therm[8]   = {0x28,0xFF,0xA2,0xB5,0x90,0x16,0x04,0xE7};   // 
-  byte Therm_1[8]     = {0x28,0xFF,0x83,0x8F,0x00,0x15,0x02,0x21};    // INPUT
-  byte Therm_2[8]     = {0x28,0xFF,0x0B,0x0A,0x62,0x15,0x01,0x84};   //  OUTPUT
+  byte Board_Therm[8] = {0x28,0xFF,0x1C,0xEE,0x87,0x16,0x03,0xF5};      // Датчик t первый этаж
+  byte Out_Therm[8]   = {0x28,0xFF,0xA2,0xB5,0x90,0x16,0x04,0xE7};     // Датчик t второй этаж
+  byte Therm_1[8]     = {0x28,0xFF,0x83,0x8F,0x00,0x15,0x02,0x21};    // INPUT Котёл обратка
+  byte Therm_2[8]     = {0x28,0xFF,0x0B,0x0A,0x62,0x15,0x01,0x84};   // OUTPUT Котел подача
+//byte Therm_3[8]     = {0x28,0xFF,0x8D,0xB5,0x87,0x16,0x03,0xC3};  // OUTDOOR Температура за окном
 #endif
 
-int Auto_Temp = 75;       // Дефолтовая автоматически поддерживаемая температура.
+int Auto_Temp = 70;       // Дефолтовая автоматически поддерживаемая температура.
 int Alarm_Temp = 85;      // Критическия температура, при достежении шлем СМС и все отключаем
 int Out_Temp = 0;         // Температура на улице
 int Main_Temp = 0;        // Температура на плате
@@ -147,14 +156,9 @@ SimpleTimer timer;
 DS1307 clock;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensorsDS18B20(&oneWire);
-//Servo myservo;                              // create servo object to control a servo 
 
 void setup()
 {
-    ArduinoOTA.setHostname("BOILER-NodeMCU"); // Задаем имя сетевого порта    
-//  ArduinoOTA.setPassword((const char *)"0000"); // Задаем пароль доступа для удаленной прошивки   
-    ArduinoOTA.begin(); // Инициализируем OTA
-
     gprsSerial.begin(9600);  delay(50);
     Serial.begin(9600);    delay(50);
     Wire.begin(SDA,SCL);
@@ -172,37 +176,22 @@ void setup()
 
     pinMode(Encoder_SW, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
     pinMode(Reset_GSM_PIN, OUTPUT);
-    pinMode(Relay_1, OUTPUT);
-    pinMode(Relay_2, OUTPUT);
-    pinMode(Relay_3, OUTPUT);
-    pinMode(Relay_4, OUTPUT);
-    pinMode(Relay_5, OUTPUT);
-    pinMode(Relay_6, OUTPUT);
-    pinMode(Speaker, OUTPUT); //Set buzzerPin as output
-    //digitalWrite(Speaker, HIGH);
     digitalWrite(Reset_GSM_PIN, HIGH);
-    digitalWrite(Relay_1, LOW);
-    digitalWrite(Relay_2, LOW);
-    digitalWrite(Relay_3, LOW);
-    digitalWrite(Relay_4, LOW);
-    digitalWrite(Relay_5, LOW);
-    digitalWrite(Relay_6, LOW);
+    WireIO.digitalWrite(Relay_1, LOW);
+    WireIO.digitalWrite(Relay_2, LOW);
+    WireIO.digitalWrite(Relay_3, LOW);
+    WireIO.digitalWrite(Relay_4, LOW);
+    WireIO.digitalWrite(Relay_5, LOW);
+    WireIO.digitalWrite(Relay_6, LOW);
     pinMode(R, INPUT_PULLUP); //  ENCODER RIGHT
     pinMode(L, INPUT_PULLUP); //  ENCODER LEFT
     digitalWrite(R, HIGH);    //  turn pullup resistor on
     digitalWrite(L, HIGH);    //  turn pullup resistor on  
     attachInterrupt(digitalPinToInterrupt(R), handleInterrupt, CHANGE);
     attachInterrupt(digitalPinToInterrupt(L), handleInterrupt, CHANGE);
-/*
-    Shifter.setRegisterPin(1, HIGH);
-    Shifter.setRegisterPin(2, HIGH);
-    Shifter.setRegisterPin(3, HIGH);
-    Shifter.setRegisterPin(4, HIGH);
-*/
     EEPROM.begin(512);
     delay(10);
     clock.begin();
-//    myservo.attach(servo_pin);
     Read_Eprom();
     sensorsDS18B20.begin();
     sensorsDS18B20.requestTemperatures();
@@ -213,14 +202,24 @@ void setup()
     GSM_ON();
     Check_GSM();
     SendStatus();
-//    gprs_init();
+    ArduinoOTA.setHostname("BOILER-NodeMCU"); // Задаем имя сетевого порта    
+//  ArduinoOTA.setPassword((const char *)"0000"); // Задаем пароль доступа для удаленной прошивки   
+    ArduinoOTA.begin(); // Инициализируем OTA
+    EnergySaveMode =  millis() + 35000; // самое время экономить жизнь OLED 
+    timer.setInterval(500L, timerHalfSec);
+//  gprs_init();
 //  fillHistory();
 //  clock.fillByYMD(2016,01,10);
 //  clock.fillByHMS(22,32,00);
 //  clock.setTime();
 //  EEPROM.write(addr_Auto_Temp, 24);
-    EnergySaveMode =  millis() + 15000; // самое время экономить жизнь OLED 
-    timer.setInterval(500L, timerHalfSec);
+
+/*
+    Shifter.setRegisterPin(1, HIGH);
+    Shifter.setRegisterPin(2, HIGH);
+    Shifter.setRegisterPin(3, HIGH);
+    Shifter.setRegisterPin(4, HIGH);
+*/
 }
 
 String GetIpString (IPAddress ip) {
@@ -370,7 +369,7 @@ if (gprsSerial.available()) {  //если GSM модуль что-то посл�
   if (currentTime > Next_Update_Draw) {         // время перерисовать экран
     ReadButton();
     UpdateDisplay();
-  //  WireIO.sendValue(encoderValue);
+
 //  WireIO.analogWrite(pinPwm, map(ldr, 0, 1023, 0, 255));
 //  myservo.write(encoderValue);
 //  delay(15);
