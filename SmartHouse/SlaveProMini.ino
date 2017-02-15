@@ -2,10 +2,8 @@
 #include <Servo.h> 
 #include <Wire.h>
 #include "WireIO_defs.h"
-#ifdef POWERSAVE
-#include <avr/sleep.h>
-#endif
 
+#define ServoPin    7   // пин серво привода
 #define BeepPin     11 // пищалка
 #define BeepToneNo  2000 // тон звука "No", герц
 #define BeepToneYes 4000 // тон звука "Yes", герц
@@ -18,10 +16,6 @@ int16_t encoderValue = 0;
 volatile command_t _cmd = UNKNOWN;
 volatile int8_t _params = 0;
 volatile int8_t _pin = -1;
-
-#ifdef POWERSAVE
-volatile uint32_t timeToSleep = 0;
-#endif
 
 void resetEvent() {
   _cmd = UNKNOWN;
@@ -49,9 +43,7 @@ int8_t decodePin(uint8_t data) {
 }
 
 void receiveEvent(int numBytes) {
-#ifdef POWERSAVE
-  timeToSleep = millis() + idleTimeout;
-#endif
+
 #ifdef SERIALDEBUG
   Serial.print(F("Wire.onReceive("));
   Serial.print(numBytes);
@@ -205,9 +197,6 @@ void receiveEvent(int numBytes) {
 }
 
 void requestEvent() {
-#ifdef POWERSAVE
-  timeToSleep = millis() + idleTimeout;
-#endif
 #ifdef SERIALDEBUG
   Serial.println(F("Wire.onRequest"));
 #endif
@@ -266,47 +255,10 @@ void setup() {
   Serial.print(slaveAddress);
   Serial.println(F(")"));
 #endif
-#ifdef POWERSAVE
-  timeToSleep = millis() + idleTimeout;
-#endif
-myservo.attach(7);
+myservo.attach(ServoPin);
 }
 
 void loop() {
-
 myservo.write(encoderValue);
   
-#ifdef POWERSAVE
-  if (millis() > timeToSleep) {
-#ifdef SERIALDEBUG
-    Serial.println(F("Sleeping"));
-    Serial.flush();
-#endif
-    uint8_t _ADCSRA = ADCSRA;
-    // Disable ADC
-    ADCSRA = 0;
-    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-    sleep_enable();
-    // Do sleep
-    sleep_cpu();
-    // Wake up
-    sleep_disable();
-    // Enable ADC
-    ADCSRA = _ADCSRA;
-    // Release TWI bus
-    TWCR = bit(TWEN) | bit(TWIE) | bit(TWEA) | bit(TWINT);
-    // Reinit TWI bus
-    Wire.begin(slaveAddress);
-#ifdef SUPERSPEED
-    Wire.setClock(800000);
-#elif defined(FASTSPEED)
-    Wire.setClock(400000);
-#endif
-#ifdef SERIALDEBUG
-    Serial.println(F("Waked up"));
-#endif
-    resetEvent();
-    timeToSleep = millis() + idleTimeout;
-  }
-#endif
 }
