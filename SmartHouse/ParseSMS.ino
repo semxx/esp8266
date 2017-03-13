@@ -60,11 +60,10 @@ void Parse_Income_SMS()
   {
     int hh = currStr.substring(9,11).toInt();        // Получим час из строки пришедшего СМС
     int mm = currStr.substring(12,15).toInt();        // Получим час из строки пришедшего СМС
-    clock.fillByHMS(hh,mm,00);
-    clock.setTime();
+    clock.setDateTime(2017, 3, 13, Hours, Minutes, 0);
     
-    clock.getTime();
-    sprintf(temp_msg, "%d:%d",clock.hour, clock.minute);
+    DateTime = clock.getDateTime();  
+    sprintf(temp_msg, "%d:%d",DateTime.hour, DateTime.minute);
     SendTextMessage(Last_Tel_Number,"Set new time:", temp_msg);        
   }
 
