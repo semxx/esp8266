@@ -10,7 +10,8 @@
 #include <EEPROM.h>
 #include <Wire.h>                 //  Для  DS1307
 #include <WireIO.h>               //  Расширяем порты с помощью Arduino PRO mini
-#include "DS1307.h"               //  Для  DS1307
+//#include "DS1307.h"               //  Для  DS1307
+#include <DS3231.h>           // Подключаем библиотеку для работы с RTC DS3231
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>     // русcификация шрифта http://focuswitharduino.blogspot.ru/2015/03/lcd-nokia-5110.html
 #include <SoftwareSerial.h>
@@ -41,7 +42,7 @@
 #define WaterControl   14         //  A0 Датчик протечки воды
 #define Reset_GSM_PIN  15         //  A1 Рестарт GSM-модуля если нет ответа по команде AT
 
-
+const int8_t pinBtn = 13;
 /*
 // Подключаем сдвиговый регистр 74HC595
 //#include <Shift595.h>
@@ -153,9 +154,12 @@ unsigned long EnergySaveMode = 0;           // Время экономить ж�
 SoftwareSerial gprsSerial(SW_RX, SW_TX);    // установка контактов 1 и 3 для программного порта
 Adafruit_SSD1306 display(OLED_RESET);
 SimpleTimer timer;
-DS1307 clock;
+//DS1307 clock;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensorsDS18B20(&oneWire);
+DS3231 clock;                 // Связываем объект clock с библиотекой DS3231
+RTCDateTime DateTime;         // Определяем сущность структуры RTCDateTime (описанной в библиотеке DS3231) для хранения считанных с часов даты и времени
+RTCAlarmTime Alarm1;          // Определяем сущность структуры RTCAlarmTime (описанной в библиотеке DS3231) для хранения считанных с первого будильника настроек даты и времени
 
 void setup()
 {
@@ -187,7 +191,8 @@ void setup()
     attachInterrupt(digitalPinToInterrupt(L), handleInterrupt, CHANGE);
     EEPROM.begin(512);
     delay(10);
-    clock.begin();
+    clock.begin();                    // Инициализируем работу с объектом библиотеки DS3231
+    clock.enableOutput(false);        // Определяем назначение вывода SQW (INT) для генерации прерываний при сработке будильников
     Read_Eprom();
     sensorsDS18B20.begin();
     sensorsDS18B20.requestTemperatures();
@@ -205,10 +210,11 @@ void setup()
     timer.setInterval(500L, timerHalfSec);
 //  gprs_init();
 //  fillHistory();
-//  clock.fillByYMD(2016,01,10);
-//  clock.fillByHMS(22,32,00);
-//  clock.setTime();
 //  EEPROM.write(addr_Auto_Temp, 24);
+//  clock.setDateTime(__DATE__, __TIME__);                  // Устанавливаем время на часах, основываясь на времени компиляции скетча
+//  clock.setDateTime(2016, 9, 15, 0, 0, 0);              // Установка времени вручную (Год, Месяц, День, Час, Минута, Секунда)
+//  setAlarm1(Дата или день, Час, Минута, Секунда, Режим)
+//  clock.setAlarm1(0, 0, 0, 10, DS3231_MATCH_S);           // Устанавливаем первый будильник на срабатывание в 10 сек. каждой минуты. Режим DS3231_MATCH_S сообщает о том, что ориентироваться надо на секунды.
 
 /*
     Shifter.setRegisterPin(1, HIGH);
@@ -216,6 +222,7 @@ void setup()
     Shifter.setRegisterPin(3, HIGH);
     Shifter.setRegisterPin(4, HIGH);
 */
+WireIO.pinMode(pinBtn, INPUT);
 }
 
 String GetIpString (IPAddress ip) {
@@ -369,6 +376,8 @@ if (gprsSerial.available()) {  //если GSM модуль что-то посл�
     }
   }
   */
+
+  
   if (currentTime > Next_Update_Draw) {         // время перерисовать экран
     ReadButton();
     UpdateDisplay();
@@ -377,6 +386,14 @@ if (gprsSerial.available()) {  //если GSM модуль что-то посл�
 //  myservo.write(encoderValue);
 //  delay(15);
     Next_Update_Draw =  millis() + 100;         // отсчитываем по 0,2 секунды
+/*  if (WireIO.digitalRead(13))
+    {
+        Next_Update_Screen_Saver =  millis() + 30000; // время для включения скринсейвера
+        EnergySaveMode =  millis() + 45000;           // время экономить жизнь OLED
+       num_Screen = 1;
+      bool btn = WireIO.digitalRead(pinBtn);
+      Serial.println(btn);
+      }*/
   }
 
   if (currentTime > Next_Update_Temp)  {        // время обновить температуру
@@ -403,10 +420,12 @@ if (gprsSerial.available()) {  //если GSM модуль что-то посл�
   
   if (plus1sec) { // если прошла 1 секунда - делаем ежесекундные дела
         plus1sec = false; // сбрасываем до следующей секунды
-        clock.getTime();// обновляем часы
-        Hours=clock.hour;
-        Minutes=clock.minute;
-        Seconds=clock.second;
+        // обновляем часы
+        DateTime = clock.getDateTime();   // Считываем c часов текущие значения даты и времени в сущность DateTime
+        Alarm1 = clock.getAlarm1();   
+        Hours=DateTime.hour;
+        Minutes=DateTime.minute;
+        Seconds=DateTime.second;
     }
     
   if(Connected2Blynk){
@@ -499,9 +518,9 @@ if (batt > 10)  {
 void SaveHistoty()
 {
 
-  if (SaveHistoryHour != clock.hour)
+  if (SaveHistoryHour != DateTime.hour)
   {
-    int adr = (1 + clock.hour) * 2 - 1;
+    int adr = (1 + DateTime.hour) * 2 - 1;
 
     EEPROM_int_write(adr + Addr_Temp_1, Out_Temp);
     EEPROM_int_write(adr + Addr_Temp_2, Main_Temp);
@@ -528,14 +547,14 @@ void SaveHistoty()
 //    Serial.print(" temp4:");
 //    Serial.println(Floor_2_Temp);
 
-    SaveHistoryHour = clock.hour;
+    SaveHistoryHour = DateTime.hour;
   }
 
 }
 
 void UpdateTemp()
 {
-  clock.getTime();
+  DateTime = clock.getDateTime();
   sensorsDS18B20.requestTemperatures();
 
   Out_Temp = sensorsDS18B20.getTempC(Out_Therm);
@@ -602,7 +621,7 @@ void UpdateTemp()
     isRelay01 = false;
     isRelay02 = false;
     isAutoHeating = false;
-    sprintf(temp_msg, "out=%dC,main=%dC,floor_1=%dC,floor_2=%dC, time: %d:%d", Out_Temp, Main_Temp, Floor_1_Temp, Floor_2_Temp, clock.hour, clock.minute);
+    sprintf(temp_msg, "out=%dC,main=%dC,floor_1=%dC,floor_2=%dC, time: %d:%d", Out_Temp, Main_Temp, Floor_1_Temp, Floor_2_Temp, DateTime.hour, DateTime.minute);
     SendTextMessage(Last_Tel_Number, F("ALARM TEMP. Floor REALAY OFF"), temp_msg);
   }
 
