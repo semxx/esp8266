@@ -132,11 +132,11 @@ String ReadGSM() {  //функция чтения данных от GSM моду
 
 void SendHistory(String Str , byte Addr)
 {
-  clock.getTime();
+  DateTime = clock.getDateTime();  
   tmp_msg="Out:"; 
   for(int val=0; val<(23); val++) 
   {
-    if (val==clock.hour) {
+    if (val==DateTime.hour) {
       tmp_msg= String(tmp_msg)  + String(">;"); 
     }
     else
@@ -152,8 +152,8 @@ void SendHistory(String Str , byte Addr)
 
 void SendStatus()
 {
-  clock.getTime();
-  sprintf(temp_msg, "out=%dC,main=%dC,floor_1=%dC,floor_2=%dC, time: %d:%d",Out_Temp,Main_Temp,Floor_1_Temp,Floor_2_Temp,clock.hour, clock.minute);
+  DateTime = clock.getDateTime(); 
+  sprintf(temp_msg, "out=%dC,main=%dC,floor_1=%dC,floor_2=%dC, time: %d:%d",Out_Temp,Main_Temp,Floor_1_Temp,Floor_2_Temp,DateTime.hour, DateTime.minute);
  
   if (isAutoHeating)   {   
     SendTextMessage(Last_Tel_Number,"Auto Heat,", temp_msg);  
