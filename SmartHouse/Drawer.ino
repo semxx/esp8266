@@ -38,10 +38,10 @@ void UpdateDisplay()
               MenuTimeoutTimer = 10; //таймер таймаута, секунд
               display.setCursor(0, 40);
               display.print("SET TIME"); //    lcd.print(F("SETUP CLOCK")); 
-              clock.getTime();
-              Hours=clock.hour;
-              Minutes=clock.minute;
-              Seconds=clock.second;
+              DateTime = clock.getDateTime();
+              Hours=DateTime.hour;
+              Minutes=DateTime.minute;
+              Seconds=DateTime.second;
               SetYesNo = false;
               PrintYesNo = true;
               SetTime(0,0); // в позиции 0,1 - запрос ввода времени
@@ -51,8 +51,10 @@ void UpdateDisplay()
                   if (BeepEnabled) {
                   // tone(BeepPin,BeepToneYes,BeepToneYesDuration); //звук "YES"
                  }
-                  clock.fillByHMS(Hours, Minutes, Seconds);    
-                  clock.setTime();
+                  // Manual (Year, Month, Day, Hour, Minute, Second)
+                  clock.setDateTime(2017, 3, 13, Hours, Minutes, Seconds);
+                  //clock.fillByHMS(Hours, Minutes, Seconds);    
+                  //clock.setTime();
                 }
                 else
                 {
@@ -264,16 +266,16 @@ void DrawBoiler(){
   
 void DrawScreenSaver()
 {
-  clock.getTime();
+  DateTime = clock.getDateTime(); 
   display.setTextSize(2);
   display.setTextColor(WHITE);
-  sprintf(temp_msg, "%02d:%02d" , clock.hour, clock.minute);
-  display.setCursor(clock.second, clock.minute / 2 + 16);
+  sprintf(temp_msg, "%02d:%02d" , DateTime.hour, DateTime.minute);
+  display.setCursor(DateTime.second, DateTime.minute / 2 + 16);
   display.print(temp_msg);
 
   display.setTextSize(1);
-  sprintf(temp_msg, "%02d" , clock.second);
-  display.setCursor(clock.second + 23, clock.minute / 2 + 12);
+  sprintf(temp_msg, "%02d" , DateTime.second);
+  display.setCursor(DateTime.second + 23, DateTime.minute / 2 + 12);
   display.print(temp_msg);
 }
 
@@ -376,17 +378,17 @@ oldEncoderValue = encoderValue;
 
   for (int x = 0 ; x < 23; x++) {
     int y = map(EEPROM_int_read((1 + x) * 2 - 1 + Addr), tmpmin - 2, tmpmax, 1, 30);
-    if (x > clock.hour) {
+    if (x > DateTime.hour) {
        display.drawRect(7 + x * 5, 50 - y, 4, y, WHITE);
     }
     else {
        display.fillRect(7 + x * 5, 50 - y, 4, y, WHITE);
     }
   }
-  int x = 8 + (clock.hour) * 5;
+  int x = 8 + (DateTime.hour) * 5;
   display.drawLine(x, 16, x, 53, WHITE);
 
-  sprintf(temp_msg, "%02d" , clock.hour);
+  sprintf(temp_msg, "%02d" , DateTime.hour);
   display.drawLine(x, 16, x, 63, WHITE);
 }
 
@@ -474,7 +476,7 @@ oldEncoderValue = encoderValue;
     old = y;
   }
 
-  int x = 4 + (clock.hour ) * 5;
+  int x = 4 + (DateTime.hour ) * 5;
   display.drawLine(x, 16, x, 63, WHITE);
 }
 
@@ -535,10 +537,10 @@ void DrawGSM(word signal)
 
 void DrawTime()
 {
-  clock.getTime();
-  sprintf(temp_msg, "%02d:%02d:%02d" , clock.hour, clock.minute, clock.second);
+  DateTime = clock.getDateTime();    
+  sprintf(temp_msg, "%02d:%02d:%02d" , DateTime.hour, DateTime.minute, DateTime.second);
   MyPrint(temp_msg, 7 * 6 - 6, 1 * 8 - 8, 1, 1);
-  sprintf(temp_msg, "%02d/%02d/%02d" , clock.dayOfMonth, clock.month, clock.year + 2000);
+  sprintf(temp_msg, "%02d/%02d/%02d" , DateTime.day, DateTime.month, DateTime.year);
   MyPrint(temp_msg, 6 * 6 - 6, 2 * 8 - 8, 1, 1);
 }
 
