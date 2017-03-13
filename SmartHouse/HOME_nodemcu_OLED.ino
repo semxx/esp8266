@@ -11,7 +11,7 @@
 #include <Wire.h>                 //  Для  DS1307
 #include <WireIO.h>               //  Расширяем порты с помощью Arduino PRO mini
 //#include "DS1307.h"               //  Для  DS1307
-#include <DS3231.h>           // Подключаем библиотеку для работы с RTC DS3231
+#include <DS3231.h>           // Подключаем библиотеку для работы с RTC DS3231 https://yadi.sk/d/EPoJicxuvDVUd
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>     // русcификация шрифта http://focuswitharduino.blogspot.ru/2015/03/lcd-nokia-5110.html
 #include <SoftwareSerial.h>
