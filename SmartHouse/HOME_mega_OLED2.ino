@@ -1,4 +1,4 @@
-//#define BLYNK_PRINT Serial     // Comment this out to disable prints and save space
+#define BLYNK_PRINT Serial     // Comment this out to disable prints and save space
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>    
 #include <WiFiUdp.h>    
@@ -9,8 +9,7 @@
 #include <DallasTemperature.h>    //  Для DS18S20, DS18B20, DS1822 
 #include <EEPROM.h>
 #include <Wire.h>                 //  Для  DS1307
-//#include <WireIO.h>               //  Расширяем порты с помощью Arduino PRO mini
-//#include "DS1307.h"               //  Для  DS1307
+#include <WireIO.h>               //  Расширяем порты с помощью Arduino PRO mini
 #include <DS3231.h>           // Подключаем библиотеку для работы с RTC DS3231 https://yadi.sk/d/EPoJicxuvDVUd
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>     // русcификация шрифта http://focuswitharduino.blogspot.ru/2015/03/lcd-nokia-5110.html
@@ -154,7 +153,6 @@ unsigned long EnergySaveMode = 0;           // Время экономить ж�
 SoftwareSerial gprsSerial(SW_RX, SW_TX);    // установка контактов 1 и 3 для программного порта
 Adafruit_SSD1306 display(OLED_RESET);
 SimpleTimer timer;
-//DS1307 clock;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensorsDS18B20(&oneWire);
 DS3231 clock;                 // Связываем объект clock с библиотекой DS3231
@@ -168,21 +166,21 @@ void setup()
     Wire.begin(SDA,SCL);
     delay(5);
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
-//    display.display();                          // show splashscreen
+    display.display();                          // show splashscreen
     delay(500);  // Clear the buffer.
-//    display.clearDisplay();                    // clears the screen and buffer
-//    WireIO.begin();
+    display.clearDisplay();                    // clears the screen and buffer
+    WireIO.begin();
     delay(500);
     Last_Tel_Number=First_Number;  
     pinMode(Encoder_SW, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
-    //pinMode(Reset_GSM_PIN, OUTPUT);
+//    pinMode(Reset_GSM_PIN, OUTPUT);
 //    digitalWrite(Reset_GSM_PIN, HIGH);
-//    WireIO.digitalWrite(Relay_1, LOW);
-//    WireIO.digitalWrite(Relay_2, LOW);
-//    WireIO.digitalWrite(Relay_3, LOW);
-//    WireIO.digitalWrite(Relay_4, LOW);
-//    WireIO.digitalWrite(Relay_5, LOW);
-//    WireIO.digitalWrite(Relay_6, LOW);
+    WireIO.digitalWrite(Relay_1, LOW);
+    WireIO.digitalWrite(Relay_2, LOW);
+    WireIO.digitalWrite(Relay_3, LOW);
+    WireIO.digitalWrite(Relay_4, LOW);
+    WireIO.digitalWrite(Relay_5, LOW);
+    WireIO.digitalWrite(Relay_6, LOW);
     pinMode(R, INPUT_PULLUP); //  ENCODER RIGHT
     pinMode(L, INPUT_PULLUP); //  ENCODER LEFT
     digitalWrite(R, HIGH);    //  turn pullup resistor on
@@ -197,19 +195,20 @@ void setup()
     sensorsDS18B20.begin();
     sensorsDS18B20.requestTemperatures();
     UpdateTemp();
-//  delay(50);
-    Beep(780, 50);
+    delay(50);
+//    Beep(780, 50);
     MyWiFi();
-//    GSM_ON();
-//    Check_GSM();
-//    SendStatus();
+    GSM_ON();
+    Check_GSM();
     ArduinoOTA.setHostname("BOILER-NodeMCU"); // Задаем имя сетевого порта    
 //  ArduinoOTA.setPassword((const char *)"0000"); // Задаем пароль доступа для удаленной прошивки   
     ArduinoOTA.begin(); // Инициализируем OTA
     EnergySaveMode =  millis() + 35000; // самое время экономить жизнь OLED 
     timer.setInterval(500L, timerHalfSec);
     timer.setInterval(300000L, Check_GSM);
+    timer.setInterval(2000L, ReadSlave);
 //  gprs_init();
+//  SendStatus();
 //  fillHistory();
 //  EEPROM.write(addr_Auto_Temp, 24);
 //  clock.setDateTime(__DATE__, __TIME__);                  // Устанавливаем время на часах, основываясь на времени компиляции скетча
@@ -223,7 +222,7 @@ void setup()
     Shifter.setRegisterPin(3, HIGH);
     Shifter.setRegisterPin(4, HIGH);
 */
-//WireIO.pinMode(pinBtn, INPUT);
+WireIO.pinMode(pinBtn, INPUT);
 }
 
 String GetIpString (IPAddress ip) {
@@ -252,11 +251,11 @@ void I2C_Wire(){
 */
 void MyWiFi(){
   display.clearDisplay(); 
-  //WiFi.disconnect();
-  //delay(200);
+  WiFi.disconnect();
+  delay(500);
   int mytimeout = millis() / 1000;
   int x = 0;
-//  WiFi.mode(WIFI_STA);
+  WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, pass);
   delay(500);
   while (WiFi.status() != WL_CONNECTED) {
@@ -409,14 +408,7 @@ if (gprsSerial.available()) {  //если GSM модуль что-то посл�
 //  myservo.write(encoderValue);
 //  delay(15);
     Next_Update_Draw =  millis() + 100;         // отсчитываем по 0,2 секунды
-/*  if (WireIO.digitalRead(13))
-    {
-        Next_Update_Screen_Saver =  millis() + 30000; // время для включения скринсейвера
-        EnergySaveMode =  millis() + 45000;           // время экономить жизнь OLED
-       num_Screen = 1;
-      bool btn = WireIO.digitalRead(pinBtn);
-      Serial.println(btn);
-      }*/
+
   }
 
   if (currentTime > Next_Update_Temp)  {        // время обновить температуру
@@ -424,13 +416,19 @@ if (gprsSerial.available()) {  //если GSM модуль что-то посл�
     Blynk.virtualWrite(V6, Floor_1_Temp);
     Blynk.virtualWrite(V7, Floor_2_Temp);
     UpdateTemp();
-    // Serial.println(WIFI_getRSSIasQuality(WiFi.RSSI()));
+    Serial.println(WIFI_getRSSIasQuality(WiFi.RSSI()));
     // CheckConnection();
     Next_Update_Temp =  millis() + 30000;       // отсчитываем по 30 секунд
-    
     //gprs_init();
   }
-
+    /*  if (WireIO.digitalRead(13))
+    {
+        Next_Update_Screen_Saver =  millis() + 30000; // время для включения скринсейвера
+        EnergySaveMode =  millis() + 45000;           // время экономить жизнь OLED
+       num_Screen = 1;
+      bool btn = WireIO.digitalRead(pinBtn);
+      Serial.println(btn);
+      }*/
   if (currentTime > Next_Update_Screen_Saver && currentTime < EnergySaveMode) {    // время включать скринсейвер на экране
     num_Screen = 0; 
     Next_Update_Screen_Saver =  millis() + 60000;  // отсчитываем по 60 секунд
@@ -516,7 +514,7 @@ void ReadButton()
         MenuTimeoutTimer = 10;                      //таймер таймаута, секунд
       if (num_Screen < max_Screen) {
         num_Screen++;
- //         Buzzer(100);                              //Beep every 500 milliseconds
+          Buzzer(100);                              //Beep every 500 milliseconds
           delay(150);
       }
       else  {
@@ -574,7 +572,12 @@ void SaveHistoty()
   }
 
 }
-
+void ReadSlave() {      
+  
+  bool btn = WireIO.digitalRead(pinBtn);
+  Serial.println(btn);
+  
+  }
 void UpdateTemp()
 {
 //  DateTime = clock.getDateTime();
