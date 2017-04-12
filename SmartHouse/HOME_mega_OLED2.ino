@@ -9,7 +9,8 @@
 #include <DallasTemperature.h>    //  Для DS18S20, DS18B20, DS1822 
 #include <EEPROM.h>
 #include <Wire.h>                 //  Для  DS1307
-#include <WireIO.h>               //  Расширяем порты с помощью Arduino PRO mini
+//#include <WireIO.h>               //  Расширяем порты с помощью Arduino PRO mini
+#include <Arduino_I2C_Port_Expander.h> // https://github.com/jaretburkett/Arduino-I2C-Port-Expander
 #include <DS3231.h>           // Подключаем библиотеку для работы с RTC DS3231 https://yadi.sk/d/EPoJicxuvDVUd
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>     // русcификация шрифта http://focuswitharduino.blogspot.ru/2015/03/lcd-nokia-5110.html
@@ -41,7 +42,18 @@
 #define WaterControl   14         //  A0 Датчик протечки воды
 #define Reset_GSM_PIN  15         //  A1 Рестарт GSM-модуля если нет ответа по команде AT
 
-const int8_t pinBtn = 13;
+   EXPAND io(0x01);      //initialize an instance of the class with address 0x01
+// EXPAND io2(0x02);  // second port expander
+/*
+Commands:
+
+io.digitalWrite(pin, HIGH | LOW); - writes pin high or low
+io.digitalRead(pin); - Returns pin value as integer. 0 for low or 1 for high
+io.digitalReadPullup(pin); - Same as digital read, but activates the  internal pullup resistor first. 
+io.analogRead(pin); - Returns analog read val as int. Must call slaves digital pin number not A0. 
+io.analogWrite(pin, 0-255); - writes pwm to pin. Must be a pwm capable pin. 
+*/
+
 /*
 // Подключаем сдвиговый регистр 74HC595
 //#include <Shift595.h>
@@ -169,18 +181,18 @@ void setup()
     display.display();                          // show splashscreen
     delay(500);  // Clear the buffer.
     display.clearDisplay();                    // clears the screen and buffer
-    WireIO.begin();
+//    WireIO.begin();
     delay(500);
     Last_Tel_Number=First_Number;  
     pinMode(Encoder_SW, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
 //    pinMode(Reset_GSM_PIN, OUTPUT);
 //    digitalWrite(Reset_GSM_PIN, HIGH);
-    WireIO.digitalWrite(Relay_1, LOW);
-    WireIO.digitalWrite(Relay_2, LOW);
-    WireIO.digitalWrite(Relay_3, LOW);
-    WireIO.digitalWrite(Relay_4, LOW);
-    WireIO.digitalWrite(Relay_5, LOW);
-    WireIO.digitalWrite(Relay_6, LOW);
+//    WireIO.digitalWrite(Relay_1, LOW);
+//    WireIO.digitalWrite(Relay_2, LOW);
+//    WireIO.digitalWrite(Relay_3, LOW);
+//    WireIO.digitalWrite(Relay_4, LOW);
+//    WireIO.digitalWrite(Relay_5, LOW);
+//    WireIO.digitalWrite(Relay_6, LOW);
     pinMode(R, INPUT_PULLUP); //  ENCODER RIGHT
     pinMode(L, INPUT_PULLUP); //  ENCODER LEFT
     digitalWrite(R, HIGH);    //  turn pullup resistor on
@@ -222,7 +234,7 @@ void setup()
     Shifter.setRegisterPin(3, HIGH);
     Shifter.setRegisterPin(4, HIGH);
 */
-WireIO.pinMode(pinBtn, INPUT);
+//WireIO.pinMode(pinBtn, INPUT);
 }
 
 String GetIpString (IPAddress ip) {
@@ -574,7 +586,9 @@ void SaveHistoty()
 }
 void ReadSlave() {      
   
-  bool btn = WireIO.digitalRead(pinBtn);
+//  bool btn = WireIO.digitalRead(pinBtn);
+//  Serial.println(btn);
+  bool btn = io.digitalReadPullup(13);
   Serial.println(btn);
   
   }
