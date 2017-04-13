@@ -54,7 +54,7 @@ int EXPAND::analogRead(byte pin){
   return received;
 }
 
-void EXPAND::ServoRotate(){
+void EXPAND::ServoRotate(byte val){
   io_DataPacket[0] = 19;    // method
   io_DataPacket[1] = val;  // val
   sendDataPacket();
