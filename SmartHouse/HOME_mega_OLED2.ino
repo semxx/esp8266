@@ -590,8 +590,15 @@ void ReadSlave() {
 //  Serial.println(btn);
   bool btn = io.digitalReadPullup(13);
   Serial.println(btn);
-  
+if (btn) {
+  num_Screen = 1;
+  } 
+
+  io.ServoRotate(encoderValue);
+   
   }
+  
+  
 void UpdateTemp()
 {
 //  DateTime = clock.getDateTime();
