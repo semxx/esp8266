@@ -39,7 +39,7 @@ byte buffer[2];
 bool useTS = false;
 
 uint16_t returninfo;
-uint16_t ServoValue; // Переменная в которую помещаем значение сервы пришедшее по I2C
+
  
 void setup(){
   Serial.begin(74880);    delay(50);
@@ -111,13 +111,10 @@ void slavesRespond(){
 		  */
 		  returninfo = analogRead(receivedPacket[1]);
 		  break;
-		case 19:  // ServoRotate
-		  /*
-			receivedPacket[1] = value
-		  */
-		  ServoValue = receivedPacket[1]; // set to ServoValue recieved value
-		  returninfo = ServoValue;
-		  break;
+    case 19: // turn on touchscreen
+        Serial.println(receivedPacket[1],DEC);
+        break;
+
 		case 20: // turn on touchscreen
 	      returninfo = 1;
 	      useTS = true;
