@@ -1,19 +1,18 @@
-#define BLYNK_PRINT Serial     // Comment this out to disable prints and save space
+#define BLYNK_PRINT Serial
 #include <ESP8266WiFi.h>
-#include <ESP8266mDNS.h>    
-#include <WiFiUdp.h>    
-#include <ArduinoOTA.h>           // Библиотека для OTA-прошивки
+#include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>                // Библиотека для OTA-прошивки
 #include <BlynkSimpleEsp8266.h>
 #include <SimpleTimer.h>
-#include <OneWire.h>              //  Для DS18S20, DS18B20, DS1822 
-#include <DallasTemperature.h>    //  Для DS18S20, DS18B20, DS1822 
+#include <OneWire.h>                   //  Для DS18S20, DS18B20, DS1822 
+#include <DallasTemperature.h>         //  Для DS18S20, DS18B20, DS1822 
 #include <EEPROM.h>
-#include <Wire.h>                 //  Для  DS1307
-//#include <WireIO.h>               //  Расширяем порты с помощью Arduino PRO mini
-#include <Arduino_I2C_Port_Expander.h> // https://github.com/jaretburkett/Arduino-I2C-Port-Expander
-#include <DS3231.h>           // Подключаем библиотеку для работы с RTC DS3231 https://yadi.sk/d/EPoJicxuvDVUd
+#include <Wire.h>                      //  Для  DS1307
+#include <Arduino_I2C_Port_Expander.h> //  Расширяем порты с помощью Arduino PRO mini https://github.com/jaretburkett/Arduino-I2C-Port-Expander
+#include <DS3231.h>                    // Подключаем библиотеку для работы с RTC DS3231 https://yadi.sk/d/EPoJicxuvDVUd
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>     // русcификация шрифта http://focuswitharduino.blogspot.ru/2015/03/lcd-nokia-5110.html
+#include <Adafruit_SSD1306.h>          // русcификация шрифта http://focuswitharduino.blogspot.ru/2015/03/lcd-nokia-5110.html
 #include <SoftwareSerial.h>
 
 // Распиновка на NodeMCU as Master (I2C)
@@ -42,11 +41,11 @@
 #define WaterControl   14         //  A0 Датчик протечки воды
 #define Reset_GSM_PIN  15         //  A1 Рестарт GSM-модуля если нет ответа по команде AT
 
-   EXPAND io(0x01);      //initialize an instance of the class with address 0x01
-// EXPAND io2(0x02);  // second port expander
+   EXPAND io(0x01);               //initialize an instance of the class with address 0x01
+
 /*
 Commands:
-
+EXPAND io2(0x02);              // second port expander
 io.digitalWrite(pin, HIGH | LOW); - writes pin high or low
 io.digitalRead(pin); - Returns pin value as integer. 0 for low or 1 for high
 io.digitalReadPullup(pin); - Same as digital read, but activates the  internal pullup resistor first. 
@@ -54,16 +53,6 @@ io.analogRead(pin); - Returns analog read val as int. Must call slaves digital p
 io.analogWrite(pin, 0-255); - writes pwm to pin. Must be a pwm capable pin. 
 */
 
-/*
-// Подключаем сдвиговый регистр 74HC595
-//#include <Shift595.h>
-#define numOfRegisters 1                    // Указываем количество используемых сдвиговых регистров 74HC595
-int latchPin = 3;                           // Пин подключен к ST_CP входу 74HC595 (Оранжевый > 8)
-int clockPin = 1;                           // Пин подключен к SH_CP входу 74HC595  (Коричневый > 12)
-int dataPin = D10;                          // Пин подключен к DS входу 74HC595 (Белый > 11)
-
-//Shift595 Shifter(dataPin, latchPin, clockPin, numOfRegisters);
-*/
 char auth[] = "4921ca8db3bc4cf6a84613ad405d9094";
 char ssid[] = "Xiaomi_2G";
 char pass[] = "panatorium";
@@ -148,7 +137,6 @@ int Addr_Temp_1 =   2;    // Адрес в ПЗУ (начало) для хран
 int Addr_Temp_2 =  50;    // +48
 int Addr_Temp_3 =  98;    // +48
 int Addr_Temp_4 = 146;    // +48
-//
 
 char Main_Text[11]    = "Main";
 char Out_Text[11]     = "Outd";
@@ -171,32 +159,33 @@ DS3231 clock;                 // Связываем объект clock с биб
 RTCDateTime DateTime;         // Определяем сущность структуры RTCDateTime (описанной в библиотеке DS3231) для хранения считанных с часов даты и времени
 RTCAlarmTime Alarm1;          // Определяем сущность структуры RTCAlarmTime (описанной в библиотеке DS3231) для хранения считанных с первого будильника настроек даты и времени
 
+/* Подключаем сдвиговый регистр 74HC595
+
+#include <Shift595.h>
+#define numOfRegisters 1                    // Указываем количество используемых сдвиговых регистров 74HC595
+int latchPin = 3;                           // Пин подключен к ST_CP входу 74HC595 (Оранжевый > 8)
+int clockPin = 1;                           // Пин подключен к SH_CP входу 74HC595  (Коричневый > 12)
+int dataPin = D10;                          // Пин подключен к DS входу 74HC595 (Белый > 11)
+
+Shift595 Shifter(dataPin, latchPin, clockPin, numOfRegisters);
+*/
 void setup()
 {
     gprsSerial.begin(9600);  delay(50);
     Serial.begin(74880);    delay(50);
     Wire.begin(SDA,SCL);
     delay(5);
-    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
-    display.display();                          // show splashscreen
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);   // initialize with the I2C addr 0x3D (for the 128x64)
+    display.display();                           // show splashscreen
     delay(500);  // Clear the buffer.
-    display.clearDisplay();                    // clears the screen and buffer
-//    WireIO.begin();
+    display.clearDisplay();                      // clears the screen and buffer
     delay(500);
     Last_Tel_Number=First_Number;  
     pinMode(Encoder_SW, INPUT_PULLUP);           //подтягиваем к кнопке внутренний резистор, что бы не паять его
-//    pinMode(Reset_GSM_PIN, OUTPUT);
-//    digitalWrite(Reset_GSM_PIN, HIGH);
-//    WireIO.digitalWrite(Relay_1, LOW);
-//    WireIO.digitalWrite(Relay_2, LOW);
-//    WireIO.digitalWrite(Relay_3, LOW);
-//    WireIO.digitalWrite(Relay_4, LOW);
-//    WireIO.digitalWrite(Relay_5, LOW);
-//    WireIO.digitalWrite(Relay_6, LOW);
-    pinMode(R, INPUT_PULLUP); //  ENCODER RIGHT
-    pinMode(L, INPUT_PULLUP); //  ENCODER LEFT
-    digitalWrite(R, HIGH);    //  turn pullup resistor on
-    digitalWrite(L, HIGH);    //  turn pullup resistor on  
+    pinMode(R, INPUT_PULLUP);                    //  ENCODER RIGHT
+    pinMode(L, INPUT_PULLUP);                    //  ENCODER LEFT
+    digitalWrite(R, HIGH);                       //  turn pullup resistor on
+    digitalWrite(L, HIGH);                       //  turn pullup resistor on  
     attachInterrupt(digitalPinToInterrupt(R), handleInterrupt, CHANGE);
     attachInterrupt(digitalPinToInterrupt(L), handleInterrupt, CHANGE);
     EEPROM.begin(512);
@@ -207,8 +196,6 @@ void setup()
     sensorsDS18B20.begin();
     sensorsDS18B20.requestTemperatures();
     UpdateTemp();
-    delay(50);
-//    Beep(780, 50);
     MyWiFi();
     GSM_ON();
     Check_GSM();
@@ -219,6 +206,7 @@ void setup()
     timer.setInterval(500L, timerHalfSec);
     timer.setInterval(300000L, Check_GSM);
     timer.setInterval(2000L, ReadSlave);
+//  Beep(780, 50);
 //  gprs_init();
 //  SendStatus();
 //  fillHistory();
@@ -234,33 +222,14 @@ void setup()
     Shifter.setRegisterPin(3, HIGH);
     Shifter.setRegisterPin(4, HIGH);
 */
-//WireIO.pinMode(pinBtn, INPUT);
+
 }
 
 String GetIpString (IPAddress ip) {
   String ipStr = String(ip[0]) + '.' + String(ip[1]) + '.' + String(ip[2]) + '.' + String(ip[3]);
   return ipStr;
 }
-/*
-void I2C_Wire(){
-//  ESP.wdtDisable();
-  int mytimeout = millis() / 1000;
-  int x = 0;
-  
- while (!WireIO.begin()) {
-//    delay(500);
-    MyPrint(F("   I2C"),         1 * 6 - 6,  1 * 8 - 8, 2, 1);
-    MyPrint(F("Connecting"),     1 * 6 - 6,  4 * 8 - 8, 2, 1);
-    MyPrint(F("_"),          1 + x * 6 - 6,  6 * 8 - 8, 2, 1);
-    display.display();
-    Serial.println(F("Cannot connect to slave device!"));
-    if((millis() / 1000) > mytimeout + 4){ // try for less than 5 seconds to connect to WiFi router
-      display.clearDisplay(); 
-      break;
-    }
-}
-}
-*/
+
 void MyWiFi(){
   display.clearDisplay(); 
   WiFi.disconnect();
@@ -318,11 +287,11 @@ void MyWiFi(){
 void CheckConnection(){
   Connected2Blynk = Blynk.connected();
   if(!Connected2Blynk){
-    //Serial.println("Not connected to Blynk server");
-    MyWiFi();  
+    Serial.println("Not connected to Blynk server");
+    Connected2Blynk = Blynk.connect(1000);
   }
   else{
-    //Serial.println("Still connected to Blynk server");    
+    Serial.println("Still connected to Blynk server");    
   }
 }
 
@@ -345,80 +314,33 @@ void handleInterrupt() {
     MenuTimeoutTimer = 10;
   }
 
-  lastEncoded = encoded; //store this value for next time
+  lastEncoded = encoded;
   Next_Update_Screen_Saver =  millis() + 60000;    
   EnergySaveMode =  millis() + 45000; // время экономить жизнь OLED
 }
 
 void loop()
 {
-//  ArduinoOTA.handle(); // Всегда готовы к прошивке 
+  ArduinoOTA.handle();                          // Всегда готовы к прошивке 
   currentTime = millis();                       // считываем время, прошедшее с момента запуска программы
-  if (gprsSerial.available())                  // Если с порта модема идет передача
+  if (gprsSerial.available())                   // Если с порта модема идет передача
   {
-    char currSymb = gprsSerial.read();         //  читаем символ из порта модема
+    char currSymb = gprsSerial.read();          //  читаем символ из порта модема
     
     if ('\n' != currSymb) {
-      currStr += String(currSymb);             // не конец строки добавляем в строку символ
+      currStr += String(currSymb);              // не конец строки добавляем в строку символ
       Serial.write(currSymb);
     }
     else {
       Serial.println("");                                     
-      Parse_Income_String();                   // конец строки начинаем ее разбор
+      Parse_Income_String();                    // конец строки начинаем ее разбор
     }
   }
- /*   char c;
-    String str;
-
-    while (gprsSerial.available()) {  //отправляем данные с GSM в Serial
-    c = gprsSerial.read();
-    Serial.write(c);
-    delay(10);
-  
-  }*/
- /*
-  while (Serial.available()) {  //сохраняем входную от консоли строку в переменную str пока не конец строки
-    c = Serial.read();
-    gprsSerial.write(c);
-    //str += c;
-    //if (c == '\n') {
-    // AnalyseCmd(&str);
-    // str = "";
-    delay(10);
-  }
-*/
-/*  
-if (gprsSerial.available()) {  //если GSM модуль что-то послал нам, то
-    Serial.println(ReadGSM());  //печатаем в монитор порта пришедшую строку
-    char currSymb = gprsSerial.read();          // читаем символ из порта модема
-      if ('\n' != currSymb) {
-      currStr += String(currSymb);              // не конец строки добавляем в строку символ
-    }
-    else {                                      // конец строки начинаем ее разбор
-      Parse_Income_String();
-    }
-  }
-
-  if (gprsSerial.available()) {                 // Если с порта модема идет передача
-    char currSymb = gprsSerial.read();          // читаем символ из порта модема
-    Serial.println(currSymb);
-    if ('\n' != currSymb) {
-      currStr += String(currSymb);              // не конец строки добавляем в строку символ
-    }
-    else {                                      // конец строки начинаем ее разбор
-      Parse_Income_String();
-    }
-  }
-  */
-
   
   if (currentTime > Next_Update_Draw) {         // время перерисовать экран
     ReadButton();
     UpdateDisplay();
-
 //  WireIO.analogWrite(pinPwm, map(ldr, 0, 1023, 0, 255));
-//  myservo.write(encoderValue);
-//  delay(15);
     Next_Update_Draw =  millis() + 100;         // отсчитываем по 0,2 секунды
 
   }
@@ -429,18 +351,11 @@ if (gprsSerial.available()) {  //если GSM модуль что-то посл�
     Blynk.virtualWrite(V7, Floor_2_Temp);
     UpdateTemp();
     Serial.println(WIFI_getRSSIasQuality(WiFi.RSSI()));
-    // CheckConnection();
+    CheckConnection();
     Next_Update_Temp =  millis() + 30000;       // отсчитываем по 30 секунд
     //gprs_init();
   }
-    /*  if (WireIO.digitalRead(13))
-    {
-        Next_Update_Screen_Saver =  millis() + 30000; // время для включения скринсейвера
-        EnergySaveMode =  millis() + 45000;           // время экономить жизнь OLED
-       num_Screen = 1;
-      bool btn = WireIO.digitalRead(pinBtn);
-      Serial.println(btn);
-      }*/
+
   if (currentTime > Next_Update_Screen_Saver && currentTime < EnergySaveMode) {    // время включать скринсейвер на экране
     num_Screen = 0; 
     Next_Update_Screen_Saver =  millis() + 60000;  // отсчитываем по 60 секунд
@@ -452,8 +367,7 @@ if (gprsSerial.available()) {  //если GSM модуль что-то посл�
   }
   
   if (plus1sec) { // если прошла 1 секунда - делаем ежесекундные дела
-        plus1sec = false; // сбрасываем до следующей секунды
-        // обновляем часы
+        plus1sec = false; // сбрасываем до следующей секунды 
         DateTime = clock.getDateTime();   // Считываем c часов текущие значения даты и времени в сущность DateTime
         Alarm1 = clock.getAlarm1();   
         Hours=DateTime.hour;
@@ -470,12 +384,10 @@ if (gprsSerial.available()) {  //если GSM модуль что-то посл�
           Buzzer(100); //Beep every 500 milliseconds
           delay(150);
          }
-    
     while (Floor_1_Temp > 79);
   }
-
   timer.run();
-} // END LOOP
+} // END MAIN LOOP
 
 
 void Buzzer(unsigned char delayms) 
@@ -488,7 +400,7 @@ void Buzzer(unsigned char delayms)
 
 void Beep(word frq, word dur)
 {
-//    WireIO.analogWrite(23,encoderValue);
+io.digitalWrite(11,1);
 //    int noteDuration = 1000 / dur;
 //    tone(Speaker, frq, noteDuration);
 //    int pauseBetweenNotes = noteDuration * 1.30;
@@ -559,40 +471,40 @@ void SaveHistoty()
     EEPROM_int_write(adr + Addr_Temp_2, Main_Temp);
     EEPROM_int_write(adr + Addr_Temp_3, Floor_1_Temp);
     EEPROM_int_write(adr + Addr_Temp_4, Floor_2_Temp);
-    
-//    Serial.print("EEPROM addr1:");
-//    Serial.print(adr + Addr_Temp_1);
-//    Serial.print(" temp1:");
-//    Serial.print(Out_Temp);
-//
-//    Serial.print(" addr2:");
-//    Serial.print(adr + Addr_Temp_2);
-//    Serial.print(" temp2:");
-//    Serial.print(Main_Temp);
-//
-//    Serial.print(" addr3:");
-//    Serial.print(adr + Addr_Temp_3);
-//    Serial.print(" temp3:");
-//    Serial.print(Floor_1_Temp);
-//
-//    Serial.print(" addr4:");
-//    Serial.print(adr + Addr_Temp_4);
-//    Serial.print(" temp4:");
-//    Serial.println(Floor_2_Temp);
 
+     /*    Debug
+    Serial.print("EEPROM addr1:");
+    Serial.print(adr + Addr_Temp_1);
+    Serial.print(" temp1:");
+    Serial.print(Out_Temp);
+
+    Serial.print(" addr2:");
+    Serial.print(adr + Addr_Temp_2);
+    Serial.print(" temp2:");
+    Serial.print(Main_Temp);
+
+    Serial.print(" addr3:");
+    Serial.print(adr + Addr_Temp_3);
+    Serial.print(" temp3:");
+    Serial.print(Floor_1_Temp);
+
+    Serial.print(" addr4:");
+    Serial.print(adr + Addr_Temp_4);
+    Serial.print(" temp4:");
+    Serial.println(Floor_2_Temp);
+*/
+     
     SaveHistoryHour = DateTime.hour;
   }
 
 }
 void ReadSlave() {      
   
-//  bool btn = WireIO.digitalRead(pinBtn);
-//  Serial.println(btn);
   bool btn = io.digitalReadPullup(13);
-  Serial.println(btn);
-if (btn) {
-  num_Screen = 1;
-  } 
+   Serial.println(btn);
+      if (btn) {
+         num_Screen = 1;
+      } 
 
   io.ServoRotate(encoderValue);
    
@@ -601,9 +513,8 @@ if (btn) {
   
 void UpdateTemp()
 {
-//  DateTime = clock.getDateTime();
   sensorsDS18B20.requestTemperatures();
-
+   
   Out_Temp = sensorsDS18B20.getTempC(Out_Therm);
   Main_Temp = sensorsDS18B20.getTempC(Board_Therm);
   Floor_1_Temp = sensorsDS18B20.getTempC(Therm_1);
