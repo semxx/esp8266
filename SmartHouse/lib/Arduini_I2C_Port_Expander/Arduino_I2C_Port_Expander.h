@@ -23,6 +23,7 @@ class EXPAND {
 	int touchscreenReadY();
 	int touchscreenReadZ();
     void sendDataPacket();
+    void sendRF433();
     int receiveResponse();
 	
   private:
