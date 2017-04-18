@@ -54,6 +54,14 @@ int EXPAND::analogRead(byte pin){
   return received;
 }
 
+void EXPAND::sendRF433(byte pin, byte val){
+  io_DataPacket[0] = 18;    // method
+  io_DataPacket[1] = pin;  // pin
+  io_DataPacket[2] = val;  // val
+  sendDataPacket();
+  int received = receiveResponse();
+}
+
 void EXPAND::ServoRotate(byte val){
   io_DataPacket[0] = 19;    // method
   io_DataPacket[1] = val;  // val
