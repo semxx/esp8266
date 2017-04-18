@@ -22,8 +22,8 @@ class EXPAND {
 	int touchscreenReadX();
 	int touchscreenReadY();
 	int touchscreenReadZ();
-    void sendDataPacket();
-    void sendRF433();
+    	void sendRF433(byte pin,byte val);
+	void sendDataPacket(byte val);
     int receiveResponse();
 	
   private:
