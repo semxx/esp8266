@@ -62,10 +62,10 @@ int         lastMQTTConnectionAttempt = 0;
 #define EEPROM_SALT 12667
 typedef struct {
   char  bootState[4]      = "off";
-  char  blynkToken[33]    = "7aefa910ba9d424bb8f6d6900fee126e";
+  char  blynkToken[33]    = "14730038da9e487cbb78fe18113011f2";
   char  blynkServer[33]   = "blynk-cloud.com";
   char  blynkPort[6]      = "8442";
-  char  mqttHostname[33]  = "";
+  char  mqttHostname[33]  = "10.10.10.25";
   char  mqttPort[6]       = "1883";
   char  mqttClientID[24]  = HOSTNAME;
   char  mqttTopic[33]     = HOSTNAME;
@@ -182,11 +182,13 @@ void setState(int state, int channel) {
 void turnOn(int channel = 0) {
   int relayState = HIGH;
   setState(relayState, channel);
+  digitalWrite(SONOFF_LED, LOW);
 }
 
 void turnOff(int channel = 0) {
   int relayState = LOW;
   setState(relayState, channel);
+  digitalWrite(SONOFF_LED, HIGH);
 }
 
 void toggleState() {
@@ -208,6 +210,7 @@ void toggle(int channel = 0) {
   Serial.println(digitalRead(SONOFF_RELAY_PINS[channel]));
   int relayState = digitalRead(SONOFF_RELAY_PINS[channel]) == HIGH ? LOW : HIGH;
   setState(relayState, channel);
+  digitalWrite(SONOFF_LED, !relayState);
 }
 
 void restart() {
