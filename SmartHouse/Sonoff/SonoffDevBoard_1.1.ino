@@ -16,24 +16,20 @@
    http://www.esp8266.com/wiki/lib/exe/fetch.php?cache=&media=esp8266-12_mod.png
 */ 
 
-#define SONOFF_INPUT                13
 #define   SONOFF_BUTTON             0
-#define   SONOFF_LED                12
+#define   SONOFF_LED                5
+#define   ONE_WIRE_BUS              4         //  Линия датчиков DS18B20
+#define   RF_PIN                    2         //  RF433 Transmitter
 #define   SONOFF_AVAILABLE_CHANNELS 4
-#define   WaterControl              15         //   Датчик протечки воды
-//#define   MovementControl           13          //  Датчик движения внутри котельной включает свет и экран
-
-const int SONOFF_RELAY_PINS[4] =    {4, 2, 5, 14};
+const int SONOFF_RELAY_PINS[4] =    {12, 13, 14, 15};
 
 #define SONOFF_LED_RELAY_STATE      false
-
 #define HOSTNAME "sonoff_rf"
 
-//comment out to completly disable respective technology
 #define INCLUDE_BLYNK_SUPPORT
 #define INCLUDE_MQTT_SUPPORT
 #define INCLUDE_RF_433_SUPPORT
-#define DS18B20_SUPPORT
+#define INCLUDE_DS18B20_SUPPORT
 
 /********************************************
    Should not need to edit below this line *
@@ -75,25 +71,9 @@ typedef struct {
   int   salt              = EEPROM_SALT;
 } WMSettings;
 
-/*
-  #define EEPROM_SALT 12661
-  typedef struct {
-  char  bootState[4]      = "on";
-  char  blynkToken[33]    = "0781e209f3d24c4589e1fedbd64099db";
-  char  blynkServer[33]   = "tzapu.com";
-  char  blynkPort[6]      = "9442";
-  char  mqttHostname[33]  = "tzapu.com";
-  char  mqttPort[6]       = "1883";
-  char  mqttClientID[24]  = "spk-socket";
-  char  mqttTopic[33]     = HOSTNAME;
-  int   salt              = EEPROM_SALT;
-  } WMSettings;
-*/
-
 WMSettings settings;
 
 #ifdef INCLUDE_RF_433_SUPPORT
-    #define RF_PIN  5
     #include <livolo.h>
     #include <RCSwitch.h>
     RCSwitch mySwitch = RCSwitch();
@@ -123,31 +103,25 @@ WMSettings settings;
     
 #endif
 
-
-#ifdef DS18B20_SUPPORT
+#ifdef INCLUDE_DS18B20_SUPPORT
 
 #include <OneWire.h>                   //  Для DS18S20, DS18B20, DS1822 
 #include <DallasTemperature.h>         //  Для DS18S20, DS18B20, DS1822
-#define ONE_WIRE_BUS   9         //  Линия датчиков DS18B20
 
 OneWire oneWire(ONE_WIRE_BUS); // http://cdn.chantrell.net/blog/wp-content/uploads/2011/10/DS18B20_Connection.jpg
 DallasTemperature sensorsDS18B20(&oneWire);
 
-  //int Out_Temp    = 0;       // Температура на улице
-  //int Indoor_Temp = 0;      // Температура внутри помещения
-  //int Input_Temp  = 0;     // Температура обратка
-  //int Output_Temp = 0;    // Температура выход
-  
   float Out_Temp,Indoor_Temp,Input_Temp,Output_Temp;
   
-  byte Indoor_t[8] = {0x28,0xFF,0x1C,0xEE,0x87,0x16,0x03,0xF5};      // Датчик t первый этаж
-  byte Out_t[8]    = {0x28,0xFF,0xA2,0xB5,0x90,0x16,0x04,0xE7};     // Датчик t второй этаж
-  byte Therm_1_t[8]= {0x28,0xFF,0x83,0x8F,0x00,0x15,0x02,0x21};    // INPUT Котёл обратка
-  byte Therm_2_t[8]= {0x28,0xFF,0x0B,0x0A,0x62,0x15,0x01,0x84};   // OUTPUT Котел подача
+  byte Indoor_t[8] = {0x28,0xFF,0x1C,0xEE,0x87,0x16,0x03,0xF5};      // Температура внутри помещения
+  byte Out_t[8]    = {0x28,0xFF,0xA2,0xB5,0x90,0x16,0x04,0xE7};     // Температура на улице
+  byte Therm_1_t[8]= {0x28,0xFF,0x83,0x8F,0x00,0x15,0x02,0x21};    // Температура обратка
+  byte Therm_2_t[8]= {0x28,0xFF,0x0B,0x0A,0x62,0x15,0x01,0x84};   // Температура выход
+
 
 void UpdateTemp()
 {
-  Serial.println("UpdateTemp() has been requested")
+  Serial.println("UpdateTemp() has been requested");
 
   sensorsDS18B20.requestTemperatures();
 
