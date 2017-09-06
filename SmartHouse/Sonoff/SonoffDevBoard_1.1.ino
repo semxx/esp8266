@@ -337,6 +337,9 @@ BLYNK_WRITE_DEFAULT() {
         Serial.print(channel);
         break;
     }
+       Serial.print("Pin: ");        Serial.println(pin);
+       Serial.print("action: ");     Serial.println(action);
+       Serial.print("channel: ");    Serial.println(channel);
   }
 }
 
