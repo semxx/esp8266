@@ -16,12 +16,12 @@
    http://www.esp8266.com/wiki/lib/exe/fetch.php?cache=&media=esp8266-12_mod.png
 */ 
 
-//#define SONOFF_INPUT              13
+#define SONOFF_INPUT                13
 #define   SONOFF_BUTTON             0
 #define   SONOFF_LED                12
 #define   SONOFF_AVAILABLE_CHANNELS 4
 #define   WaterControl              15         //   Датчик протечки воды
-#define   MovementControl           13          //  Датчик движения внутри котельной включает свет и экран
+//#define   MovementControl           13          //  Датчик движения внутри котельной включает свет и экран
 
 const int SONOFF_RELAY_PINS[4] =    {4, 2, 5, 14};
 
