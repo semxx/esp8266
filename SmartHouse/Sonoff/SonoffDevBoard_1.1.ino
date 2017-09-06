@@ -14,6 +14,9 @@
    gpio 13 - green led - active low
    gpio 14 - pin 5 on header
    http://www.esp8266.com/wiki/lib/exe/fetch.php?cache=&media=esp8266-12_mod.png
+
+ESP8266 GPIO AVAILIBLE: 0, 2, 4, 5, 12, 13, 14, 15
+
 */ 
 
 #define   SONOFF_BUTTON             0
