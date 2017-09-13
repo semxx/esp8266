@@ -12,7 +12,7 @@
 long hystyresis = 10 * 60 * 1000; // 30 min
 long lasttime;   //last time messages' scan has been done
 
-#define GPIO 2
+#define GPIO 5
 
 const char* WIFI_SSID            = "Xiaomi_2G";
 const char* WIFI_PASSWORD        = "panatorium";
