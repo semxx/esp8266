@@ -19,12 +19,12 @@ ESP8266 GPIO AVAILIBLE: 0, 2, 4, 5, 12, 13, 14, 15
 
 */ 
 
-#define   SONOFF_BUTTON             0
-#define   SONOFF_LED                2
-#define   ONE_WIRE_BUS              4         //  Линия датчиков DS18B20
-#define   RF_PIN                    5         //  RF433 Transmitter
+#define   SONOFF_BUTTON             0         //0 - D3
+#define   SONOFF_LED                2         //2 - D4
+#define   ONE_WIRE_BUS              4         //4 - D2  Линия датчиков DS18B20
+#define   RF_PIN                    15         //5 - D1  RF433 Transmitter
 #define   SONOFF_AVAILABLE_CHANNELS 4
-const int SONOFF_RELAY_PINS[4] =    {12, 13, 14, 15};
+const int SONOFF_RELAY_PINS[4] =    {12, 13, 14, 5}; //  D6 D7 D5 D8
 
 #define SONOFF_LED_RELAY_STATE      false
 #define HOSTNAME "sonoff"
@@ -33,7 +33,7 @@ const int SONOFF_RELAY_PINS[4] =    {12, 13, 14, 15};
 #define INCLUDE_MQTT_SUPPORT
 #define INCLUDE_RF_433_SUPPORT
 #define INCLUDE_DS18B20_SUPPORT
-
+#define INCLUDE_WakeOnLAN_SUPPORT
 /********************************************
    Should not need to edit below this line *
  * *****************************************/
@@ -44,6 +44,7 @@ const int SONOFF_RELAY_PINS[4] =    {12, 13, 14, 15};
 #define BLYNK_PRINT Serial    // Comment this out to disable prints and save space
 #include <BlynkSimpleEsp8266.h>
 #include <SimpleTimer.h>
+SimpleTimer timer;
 static bool BLYNK_ENABLED = true;
 #endif
 
@@ -52,13 +53,12 @@ static bool BLYNK_ENABLED = true;
 
 WiFiClient wclient;
 PubSubClient mqttClient(wclient);
-SimpleTimer timer;
+
 static bool MQTT_ENABLED              = true;
 int         lastMQTTConnectionAttempt = 0;
 #endif
 
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
-
 #include <EEPROM.h>
 
 #define EEPROM_SALT 12667
@@ -107,7 +107,6 @@ WMSettings settings;
 #endif
 
 #ifdef INCLUDE_DS18B20_SUPPORT
-
 #include <OneWire.h>                   //  Для DS18S20, DS18B20, DS1822 
 #include <DallasTemperature.h>         //  Для DS18S20, DS18B20, DS1822
 
@@ -129,8 +128,8 @@ void UpdateTemp()
 
   sensorsDS18B20.requestTemperatures();
 
-  Out_Temp = sensorsDS18B20.getTempC(Indoor_t);
-  Indoor_Temp  = sensorsDS18B20.getTempC(Out_t);
+  Indoor_Temp = sensorsDS18B20.getTempC(Indoor_t);
+  Out_Temp = sensorsDS18B20.getTempC(Out_t);
   Input_Temp = sensorsDS18B20.getTempC(Therm_1_t);
   Output_Temp = sensorsDS18B20.getTempC(Therm_2_t);
 
@@ -139,8 +138,8 @@ void UpdateTemp()
   char t3_buffer[15];
   char t4_buffer[15]; 
    
-  dtostrf(Out_Temp,    4, 2, t1_buffer);  
-  dtostrf(Indoor_Temp, 4, 2, t2_buffer); 
+  dtostrf(Indoor_Temp, 4, 2, t1_buffer);  
+  dtostrf(Out_Temp,    4, 2, t2_buffer); 
   dtostrf(Input_Temp,  4, 2, t3_buffer); 
   dtostrf(Output_Temp, 4, 2, t4_buffer);  
   
@@ -160,9 +159,34 @@ void UpdateTemp()
   
   sprintf(topic, "%s/thermal-4/status", settings.mqttTopic);
   mqttClient.publish(topic, t4_buffer);
-  Blynk.virtualWrite(V23, t3_buffer);
+  Blynk.virtualWrite(V23, t4_buffer);
 }
 
+#endif
+
+#ifdef INCLUDE_WakeOnLAN_SUPPORT
+#include <WiFiUDP.h>
+const byte targetMacAddress[] = { 0x90, 0x2b, 0x34, 0x5c, 0x97, 0xd4 }; // MAC адрес компа, который нужно разбудить
+const byte targetIPAddress[] = { 10, 10, 10, 255 }; // IP адрес компа, который нужно разбудить. Также можно указать широковещательный адрес сети, указав в 4м сегменте 255
+const int targetWOLPort = 9;  // WOL порт. Обычно 7 или 9
+const unsigned int localUdpPort = 12345;
+
+WiFiUDP Udp;
+
+void sendWOL() {
+  const int magicPacketLength = 102;
+  byte magicPacket[magicPacketLength] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+ 
+  for (int ix=6; ix < magicPacketLength; ix++)
+    magicPacket[ix] = targetMacAddress[ix % 6];
+ 
+  Udp.begin(localUdpPort);
+  Udp.beginPacket(targetIPAddress, targetWOLPort);
+  Udp.write(magicPacket, magicPacketLength);
+  Udp.endPacket();
+  Udp.stop();
+Serial.println("Send magicPacket");
+}
 #endif
 
 #include <ArduinoOTA.h>
@@ -173,7 +197,7 @@ const int CMD_WAIT = 0;
 const int CMD_BUTTON_CHANGE = 1;
 
 int cmd = CMD_WAIT;  //int relayState = HIGH;
-int buttonState = HIGH;  //inverted button state
+int buttonState = LOW;  //inverted button state
 
 static long startPress = 0;
 
@@ -353,6 +377,14 @@ BLYNK_READ_DEFAULT() {
 
 }
 */
+#ifdef INCLUDE_WakeOnLAN_SUPPORT
+BLYNK_WRITE(29) {
+  int a = param.asInt();
+  if (a != 0) {
+    sendWOL();
+  }
+}
+#endif
 //restart - button
 BLYNK_WRITE(30) {
   int a = param.asInt();
@@ -616,7 +648,7 @@ void setup()
 #ifdef INCLUDE_DS18B20_SUPPORT
   sensorsDS18B20.begin();
   sensorsDS18B20.requestTemperatures();
-  timer.setInterval(15000L, UpdateTemp);
+  timer.setInterval(60000L, UpdateTemp);
 #endif
 
 }
