@@ -4,6 +4,9 @@
 #include <WiFiClientSecure.h>
 #include <ESP8266TelegramBOT.h>
 #include "FS.h"
+#include <SimpleTimer.h>
+
+SimpleTimer timer;
 
 #define BOTtoken "165672905:AAFhk3XgHITZGDA_M2XEoxAhFaOdxl1Wf6Q"  //token of TestBOT
 #define BOTname "Neato"
@@ -67,10 +70,10 @@ void connectToWifi() {
   WiFi.mode(WIFI_STA);  
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+    delay(1000);
     Serial.print(".");
     i++;
-    if (i > 50) {
+    if (i > 60) {
         Serial.println("can’t connect to wifi");
         markError();
         cyclePower();
@@ -214,6 +217,8 @@ void setup() {
                 setSyncInterval(300);
                 Serial.println("");
                 Serial.println("Internet Smart Plug");
+  timer.setInterval(3600000L, mainLoop);
+  mainLoop();
   }
 
 String AddZero(String input) {
@@ -264,82 +269,79 @@ void GetTimeString() {
 
 
 void loop() {
-String result;
-String messg;
-boolean online;
-boolean getTime = false;
-unsigned short i = 0;
+ timer.run();
+}
 
-  {
-    File in = SPIFFS.open("/tmp.txt", "r");
-    if (in) {
-        in.setTimeout(0);
-        result = in.readString();
+void mainLoop() {
+  
+    String result;
+    String messg;
+    boolean online;
+    boolean getTime = false;
+    unsigned short i = 0;
+    
+      {
+        File in = SPIFFS.open("/tmp.txt", "r");
+        if (in) {
+            in.setTimeout(0);
+            result = in.readString();
+        }
+        else { 
+              fail("failed to open tmp.txt for reading");
+             }
+    
+      }
+    
+    {
+        File in = SPIFFS.open("/err.txt", "r");
+        if (in) {
+    
+            Serial.println("send message.."); 
+            Serial.println(result); 
+            messg += result;
+            messg += " Smart Plug WatchDog is down :-(";
+            bot.sendMessage("161933663", messg, "");
+            yield();
+            GetTimeString();
+            yield();
+            messg = timeString;
+            messg += " Smart Plug WatchDog sucsessfully up!";
+            bot.sendMessage("161933663", messg, "");
+            Serial.println("send message complete..");
+            cleanError(); 
+            delay(2000);
+            Serial.println("restarting");
+            ESP.restart();  
+        }
     }
-    else { 
-          fail("failed to open tmp.txt for reading");
-         }
+    
+      do {
+        boolean check1 = get(CHECK_HOST1, CHECK_URL1);
+        boolean check2 = get(CHECK_HOST2, CHECK_URL2);
+        online = (check1 || check2);
+      } while(!online && i++ < MAX_TRIES);
+    
+      Serial.println("");
+      Serial.print("status: ");
+      Serial.println(online ? "OK" : "KO");
+      Serial.println("");
+    
+      
+      if (!online) {
+        markError();
+        cyclePower();
+        stopWifiAndReboot();
+        
+      } else {
+              GetTimeString();
+             //     if (millis() > lasttime + hystyresis || !getTime )  {
+                      UpdateTelegramMessageFile();
+    
+                 // }
+    
+              }
 
   }
-
-{
-    File in = SPIFFS.open("/err.txt", "r");
-    if (in) {
-
-        Serial.println("send message.."); 
-        Serial.println(result); 
-        messg += result;
-        messg += " Smart Plug WatchDog is down :-(";
-        bot.sendMessage("161933663", messg, "");
-        yield();
-        GetTimeString();
-        yield();
-        messg = timeString;
-        messg += " Smart Plug WatchDog sucsessfully up!";
-        bot.sendMessage("161933663", messg, "");
-        Serial.println("send message complete..");
-        cleanError(); 
-        delay(2000);
-        Serial.println("restarting");
-        ESP.restart();  
-    }
-}
-
-  do {
-    boolean check1 = get(CHECK_HOST1, CHECK_URL1);
-    boolean check2 = get(CHECK_HOST2, CHECK_URL2);
-    online = (check1 || check2);
-  } while(!online && i++ < MAX_TRIES);
-
-  Serial.println("");
-  Serial.print("status: ");
-  Serial.println(online ? "OK" : "KO");
-  Serial.println("");
-
-  
-  if (!online) {
-    markError();
-    cyclePower();
-    stopWifiAndReboot();
-    
-  } else {
-          GetTimeString();
-         //     if (millis() > lasttime + hystyresis || !getTime )  {
-                  UpdateTelegramMessageFile();
-
-             // }
-
-          }
-
-delay(10000);
-//                  getTime = true;
-//                  lasttime = millis();
-//              else {
-//                Serial.println("Wait for hysteresis time for UpdateTelegramMessageFile()");
-//                Serial.println(getTime);
-//                }
-}
-
 /*-------- NTP code ----------*/
 
 const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
