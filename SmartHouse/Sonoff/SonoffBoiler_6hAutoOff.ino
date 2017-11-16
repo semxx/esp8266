@@ -610,14 +610,14 @@ void setup()
 void checkStage ()
 {
     if (RelayStage != 0 and RelayStage < 7) {
-        Blynk.notify  ("Boiler 4kWh still heating... Stage:" + String(RelayStage) + "/6");
-        Serial.println("Boiler 4kWh still heating... Stage:" + String(RelayStage) + "/6");
+        Blynk.notify  ("Boiler 4kWh still heating... Stage:" + String(RelayStage) + "/7");
+        Serial.println("Boiler 4kWh still heating... Stage:" + String(RelayStage) + "/7");
         RelayStage++;
     }
     if (RelayStage >= 7) {
         digitalWrite(SONOFF_LED, HIGH);
         turnOff();
-        Blynk.notify ("Complete. Boiler 4kWh has been stoped by timeout... Stage:" + String(RelayStage) + "/6");
+        Blynk.notify ("Complete. Boiler 4kWh has been stoped by timeout... Stage:" + String(RelayStage) + "/7");
         Serial.println("Complete. Boiler 4kWh has been stoped by timeout...");
         RelayStage = 0;
     }
