@@ -24,7 +24,7 @@ const int SONOFF_RELAY_PINS[4] =    {12, 4, 4, 4};
 //if this is false, led is used to signal startup state, then always on
 //if it s true, it is used to signal startup state, then mirrors relay state
 //S20 Smart Socket works better with it false
-#define SONOFF_LED_RELAY_STATE      false
+#define SONOFF_LED_RELAY_STATE      true
 
 #define HOSTNAME "light"
 
@@ -332,10 +332,12 @@ BLYNK_READ_DEFAULT() {
 BLYNK_WRITE(29) {
   int a = param.asInt();
   if (a != 0) {
-    mySwitch.sendTriState(socket3TriStateOn);
+        const char *str2 = "FFFF0FF10001";
+        SendRF433(str2);
   }
   else {
-    mySwitch.sendTriState(socket3TriStateOff);  
+        const char *str2 = "FFFF0FF10010";
+        SendRF433(str2);  
   }
 }
   
@@ -609,18 +611,19 @@ void setup()
 
 void checkStage ()
 {
-    if (RelayStage != 0 and RelayStage < 7) {
-        Blynk.notify  ("Boiler 4kWh still heating... Stage:" + String(RelayStage) + "/7");
-        Serial.println("Boiler 4kWh still heating... Stage:" + String(RelayStage) + "/7");
-        RelayStage++;
-    }
     if (RelayStage >= 7) {
         digitalWrite(SONOFF_LED, HIGH);
         turnOff();
-        Blynk.notify ("Complete. Boiler 4kWh has been stoped by timeout... Stage:" + String(RelayStage) + "/7");
+        Blynk.notify ("Complete. Boiler 4kWh has been stoped by timeout... Check the temperature sensors and restart heating cycle if it necessary");
         Serial.println("Complete. Boiler 4kWh has been stoped by timeout...");
         RelayStage = 0;
     }
+    if (RelayStage != 0 and RelayStage < 7) {
+        Blynk.notify  ("Boiler 4kWh still heating... Stage:" + String(RelayStage) + "/6");
+        Serial.println("Boiler 4kWh still heating... Stage:" + String(RelayStage) + "/6");
+        RelayStage++;
+    }
+
     
 }
 
