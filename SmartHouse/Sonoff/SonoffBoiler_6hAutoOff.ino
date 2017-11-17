@@ -14,6 +14,13 @@
    gpio 13 - green led - active low
    gpio 14 - pin 5 on header
 
+    Blynk.virtualWrite(vPIN_CUR_DATE,  getCurrentDate() + String("  ") + getCurrentTime() );
+    Blynk.setProperty(vPIN_CUR_DATE, "label", String("WIFI: ") + String(map(WiFi.RSSI(), -105, -40, 0, 100)) + String("% (") + WiFi.RSSI() + String("dB)") + String(" IP: ") + WiFi.localIP().toString());
+    timer.disable(timer2);
+      Blynk.syncVirtual(vPIN_GATE_COUNTER);
+      Blynk.syncVirtual(vPIN_BELL_COUNTER);
+      setSyncInterval(300);
+
 */
 
 #define   SONOFF_BUTTON             0
