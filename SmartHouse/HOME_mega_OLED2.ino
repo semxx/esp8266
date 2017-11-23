@@ -186,8 +186,10 @@ void setup()
     pinMode(L, INPUT_PULLUP);                    //  ENCODER LEFT
     digitalWrite(R, HIGH);                       //  turn pullup resistor on
     digitalWrite(L, HIGH);                       //  turn pullup resistor on  
+ //   digitalWrite(Encoder_SW, HIGH);                       //  turn pullup resistor on 
     attachInterrupt(digitalPinToInterrupt(R), handleInterrupt, CHANGE);
     attachInterrupt(digitalPinToInterrupt(L), handleInterrupt, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(Encoder_SW), handlePush, RISING);
     EEPROM.begin(512);
     delay(10);
     clock.begin();                    // Инициализируем работу с объектом библиотеки DS3231
@@ -319,6 +321,23 @@ void handleInterrupt() {
   EnergySaveMode =  millis() + 45000; // время экономить жизнь OLED
 }
 
+void handlePush() {
+      MenuTimeoutTimer = 10;                      //таймер таймаута, секунд
+      if (num_Screen < max_Screen) {
+        num_Screen++;
+  Serial.println("Push");
+   //       Buzzer(100);                              //Beep every 500 milliseconds
+
+   //      delay(150);
+
+          
+          }
+      else  {
+        num_Screen = 1;
+      }
+      Next_Update_Screen_Saver =  millis() + 30000; // время для включения скринсейвера
+      EnergySaveMode =  millis() + 45000;           // время экономить жизнь OLED
+}
 void loop()
 {
   ArduinoOTA.handle();                          // Всегда готовы к прошивке 
@@ -338,7 +357,7 @@ void loop()
   }
   
   if (currentTime > Next_Update_Draw) {         // время перерисовать экран
-    ReadButton();
+  //  ReadButton();
     UpdateDisplay();
 //  WireIO.analogWrite(pinPwm, map(ldr, 0, 1023, 0, 255));
     Next_Update_Draw =  millis() + 100;         // отсчитываем по 0,2 секунды
@@ -503,7 +522,7 @@ void ReadSlave() {
   bool btn = io.digitalReadPullup(13);
    Serial.println(btn);
       if (btn) {
-         num_Screen = 1;
+    //     num_Screen = 1;
       } 
 
   io.ServoRotate(encoderValue);
