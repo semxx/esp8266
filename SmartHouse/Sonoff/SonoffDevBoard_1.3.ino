@@ -15,7 +15,19 @@
    gpio 14 - pin 5 on header
    http://www.esp8266.com/wiki/lib/exe/fetch.php?cache=&media=esp8266-12_mod.png
 
-ESP8266 GPIO AVAILIBLE: 0, 2, 4, 5, 12, 13, 14, 15
+ Распиновка на NodeMCU as Master (I2C) https://www.cnx-software.com/wp-content/uploads/2015/10/NodeMCU_v0.9_Pinout.png
+ 	ESP8266 GPIO AVAILIBLE: 0, 2, 4, 5, 12, 13, 14, 15
+		D0		GPIO - 16	WAKE		
+		D1		GPIO - 5  ~	
+		D2		GPIO - 4  ~
+		D3		GPIO - 0	FLASH
+		D4		GPIO - 2  ~
+		D5		GPIO - 14 ~
+		D6		GPIO - 12 ~
+		D7		GPIO - 13 ~
+		D8		GPIO - 15 ~
+		D9		GPIO - 3  ~	(rx)
+		D10	GPIO - 1  ~	(tx)
 
 */ 
 
