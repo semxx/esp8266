@@ -129,6 +129,8 @@ int  encoderValue = 0;
 int  lastMSB = 0;
 int  lastLSB = 0;
 long lastencoderValue = 0;
+long LAST_DEBOUNCE_TIME = 0;
+long DEBOUNCE_DELAY = 50;
 
 //  Ниже не значения, а адреса ячеек ПЗУ
 int Addr_Auto_Temp = 0;   // Адрес в ПЗУ для Auto_Temp
@@ -236,7 +238,7 @@ void MyWiFi(){
   display.clearDisplay(); 
   WiFi.disconnect();
   delay(500);
-  int mytimeout = millis() / 1000;
+  int mytimeout = millis() / 500;
   int x = 0;
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, pass);
@@ -263,7 +265,7 @@ void MyWiFi(){
         MyPrint(F("Connected!"), 1 * 6 - 6, 4 * 8 - 8, 2, 1);
         MyPrint(ipString,        1 * 6 - 6, 7 * 8 - 8, 1, 1);
         display.display();
-        delay(2500);
+        delay(1500);
     }   
   else {
         mytimeout = millis() / 1000;       
@@ -303,23 +305,27 @@ void handleInterrupt() {
 
   int encoded = (MSB << 1) |LSB;             //converting the 2 pin value to single number
   int sum  = (lastEncoded << 2) | encoded;  //adding it to the previous encoded value
+  
+        if(sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) 
+        { 
+          encoderValue --;
+          encoderR = true;
+          MenuTimeoutTimer = 10;
+          Serial.println("Val--");   
+        }
+        if(sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) {
+          encoderValue ++;
+          encoderL = true;
+          MenuTimeoutTimer = 10;
+         Serial.println("Val++"); 
+        }
+      
+        lastEncoded = encoded;
+        Next_Update_Screen_Saver =  millis() + 60000;    
+        EnergySaveMode =  millis() + 45000; // время экономить жизнь OLED
 
-  if(sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) 
-  { 
-    encoderValue --;
-    encoderR = true;
-    MenuTimeoutTimer = 10;
-  }
-  if(sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) {
-    encoderValue ++;
-    encoderL = true;
-    MenuTimeoutTimer = 10;
   }
 
-  lastEncoded = encoded;
-  Next_Update_Screen_Saver =  millis() + 60000;    
-  EnergySaveMode =  millis() + 45000; // время экономить жизнь OLED
-}
 
 void handlePush() {
       MenuTimeoutTimer = 10;                      //таймер таймаута, секунд
