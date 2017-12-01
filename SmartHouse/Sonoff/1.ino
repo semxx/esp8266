@@ -1,22 +1,31 @@
 /*
    1MB flash sizee
-
    sonoff header
    1 - vcc 3v3
    2 - rx
    3 - tx
    4 - gnd
    5 - gpio 14
-
    esp8266 connections
    gpio  0 - button
    gpio 12 - relay
    gpio 13 - green led - active low
    gpio 14 - pin 5 on header
    http://www.esp8266.com/wiki/lib/exe/fetch.php?cache=&media=esp8266-12_mod.png
-
-ESP8266 GPIO AVAILIBLE: 0, 2, 4, 5, 12, 13, 14, 15
-
+ Распиновка на NodeMCU as Master (I2C) https://www.cnx-software.com/wp-content/uploads/2015/10/NodeMCU_v0.9_Pinout.png
+ 	ESP8266 GPIO AVAILIBLE: 0, 2, 4, 5, 12, 13, 14, 15
+	
+	D0		GPIO - 16	WAKE		
+	D1		GPIO - 5  ~	
+	D2		GPIO - 4  ~
+	D3		GPIO - 0	FLASH
+	D4		GPIO - 2  ~
+	D5		GPIO - 14 ~
+	D6		GPIO - 12 ~
+	D7		GPIO - 13 ~
+	D8		GPIO - 15 ~
+	D9		GPIO - 3  ~	(rx)
+	D10	GPIO - 1  ~	(tx)
 */ 
 
 #define   SONOFF_BUTTON             0         //0 - D3
@@ -24,7 +33,7 @@ ESP8266 GPIO AVAILIBLE: 0, 2, 4, 5, 12, 13, 14, 15
 #define   ONE_WIRE_BUS              4         //4 - D2  Линия датчиков DS18B20
 #define   RF_PIN                    15         //15 - D8  RF433 Transmitter
 #define   SONOFF_AVAILABLE_CHANNELS 4
-//#define BLYNK_DEBUG
+
 const int SONOFF_RELAY_PINS[4] =    {12, 13, 14, 5}; //  D6 D7 D5 D1
 
 #define SONOFF_LED_RELAY_STATE      false
@@ -42,6 +51,7 @@ const int SONOFF_RELAY_PINS[4] =    {12, 13, 14, 5}; //  D6 D7 D5 D1
 #include <ESP8266WiFi.h>
 #include "functions.h"
 #ifdef INCLUDE_BLYNK_SUPPORT
+//#define BLYNK_DEBUG
 #define BLYNK_PRINT Serial    // Comment this out to disable prints and save space
 #include <BlynkSimpleEsp8266.h>
 #include <SimpleTimer.h>
@@ -59,7 +69,8 @@ int         lastMQTTConnectionAttempt = 0;
 #endif
 
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
-
+#include <ArduinoOTA.h>
+#include <Ticker.h> //for LED status
 #include <EEPROM.h>
 
 #define EEPROM_SALT 12667
@@ -76,6 +87,7 @@ typedef struct {
 } WMSettings;
 
 WMSettings settings;
+Ticker ticker;
 
 #ifdef INCLUDE_RF_433_SUPPORT
  //   #include <livolo.h>
@@ -116,7 +128,6 @@ OneWire oneWire(ONE_WIRE_BUS); // http://cdn.chantrell.net/blog/wp-content/uploa
 DallasTemperature sensorsDS18B20(&oneWire);
 
   float Out_Temp,Indoor_Temp,Input_Temp,Output_Temp;
- //28FF91B08716031F
 
   byte Indoor_t[8] = {0x28,0xFF,0x91,0xB0,0x87,0x16,0x03,0x1F};      // Температура внутри помещения
   byte Out_t[8]    = {0x28,0xFF,0xA2,0xB5,0x90,0x16,0x04,0xE7};     // Температура на улице
@@ -165,10 +176,6 @@ void UpdateTemp()
 }
 
 #endif
-
-#include <ArduinoOTA.h>
-#include <Ticker.h> //for LED status
-Ticker ticker;
 
 const int CMD_WAIT = 0;
 const int CMD_BUTTON_CHANGE = 1;
