@@ -89,7 +89,7 @@ char   temp_msg[160];              // Переменная , в нее пише�
 
 byte MenuTimeoutTimer;
 byte num_Screen = 1;               // текущий экран
-byte max_Screen = 8;               // всего экранов
+byte max_Screen = 6;               // всего экранов
 byte batt = 0;                     // Переменная хранит заряд батареи
 byte sgsm = 0;                     // Переменная хранит уровень сигнала сети
 
@@ -174,7 +174,7 @@ Shift595 Shifter(dataPin, latchPin, clockPin, numOfRegisters);
 void setup()
 {
     gprsSerial.begin(9600);  delay(50);
-    Serial.begin(74880);    delay(50);
+    Serial.begin(9600);    delay(50);
     Wire.begin(SDA,SCL);
     delay(5);
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);   // initialize with the I2C addr 0x3D (for the 128x64)
@@ -202,14 +202,14 @@ void setup()
     UpdateTemp();
     MyWiFi();
     GSM_ON();
-    Check_GSM();
+//  Check_GSM();
     ArduinoOTA.setHostname("BOILER-NodeMCU"); // Задаем имя сетевого порта    
 //  ArduinoOTA.setPassword((const char *)"0000"); // Задаем пароль доступа для удаленной прошивки   
     ArduinoOTA.begin(); // Инициализируем OTA
     EnergySaveMode =  millis() + 35000; // самое время экономить жизнь OLED 
     timer.setInterval(500L, timerHalfSec);
-    timer.setInterval(300000L, Check_GSM);
-    timer.setInterval(2000L, ReadSlave);
+    timer.setInterval(30000L, Check_GSM);
+//    timer.setInterval(2000L, ReadSlave);
 //  Beep(780, 50);
 //  gprs_init();
 //  SendStatus();
@@ -295,7 +295,7 @@ void CheckConnection(){
     Connected2Blynk = Blynk.connect(1000);
   }
   else{
-    Serial.println("Still connected to Blynk server");    
+//    Serial.println("Still connected to Blynk server");    
   }
 }
 
@@ -348,6 +348,13 @@ void loop()
 {
   ArduinoOTA.handle();                          // Всегда готовы к прошивке 
   currentTime = millis();                       // считываем время, прошедшее с момента запуска программы
+
+if (Serial.available()){           // Ожидаем команды по Serial...
+    gprsSerial.write(Serial.read());    // ...и отправляем полученную команду модему
+    gprsSerial.println("");
+    delay(50); // задержка на обработку команды
+    toSerial();
+}
   if (gprsSerial.available())                   // Если с порта модема идет передача
   {
     char currSymb = gprsSerial.read();          //  читаем символ из порта модема
@@ -375,7 +382,7 @@ void loop()
     Blynk.virtualWrite(V6, Floor_1_Temp);
     Blynk.virtualWrite(V7, Floor_2_Temp);
     UpdateTemp();
-    Serial.println(WIFI_getRSSIasQuality(WiFi.RSSI()));
+    //Serial.println(WIFI_getRSSIasQuality(WiFi.RSSI()));
     CheckConnection();
     Next_Update_Temp =  millis() + 30000;       // отсчитываем по 30 секунд
     //gprs_init();
