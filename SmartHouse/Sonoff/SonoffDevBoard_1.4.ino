@@ -227,12 +227,12 @@ void updateBlynk(int channel) {
 #ifdef INCLUDE_BLYNK_SUPPORT
   int state = digitalRead(SONOFF_RELAY_PINS[channel]);
   Blynk.virtualWrite(channel * 5 + 4, state * 255);
-  int ch = channel + 1;
+  int v_channel = channel + 1;
   if (state == HIGH) {
-    Blynk.setProperty(ch + 1 * 5 - 4, "color", "#ff4f00");
+    Blynk.setProperty(v_channel * 5 - 4, "color", "#ff4f00");
   }
   else {
-    Blynk.setProperty(ch + 1 * 5 - 4, "color", "#23C48E");
+    Blynk.setProperty(v_channel * 5 - 4, "color", "#23C48E");
   }
   yield();
   Blynk.virtualWrite(V28,  getCurrentDate() + String("  ") + getCurrentTime() );
