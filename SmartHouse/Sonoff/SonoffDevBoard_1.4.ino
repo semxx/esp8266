@@ -25,7 +25,7 @@
 	D7		GPIO - 13 ~
 	D8		GPIO - 15 ~
 	D9		GPIO - 3  ~	(rx)
-	D10	GPIO - 1  ~	(tx)
+	D10		GPIO - 1  ~	(tx)
 */ 
 
 #define   SONOFF_BUTTON             0         //0 - D3
@@ -55,6 +55,7 @@ const int SONOFF_RELAY_PINS[4] =    {12, 13, 14, 5}; //  D6 D7 D5 D1
 #define BLYNK_PRINT Serial    // Comment this out to disable prints and save space
 #include <BlynkSimpleEsp8266.h>
 #include <SimpleTimer.h>
+SimpleTimer timer;
 static bool BLYNK_ENABLED = true;
 #endif
 
@@ -63,7 +64,6 @@ static bool BLYNK_ENABLED = true;
 
 WiFiClient wclient;
 PubSubClient mqttClient(wclient);
-SimpleTimer timer;
 static bool MQTT_ENABLED              = true;
 int         lastMQTTConnectionAttempt = 0;
 #endif
@@ -156,23 +156,27 @@ void UpdateTemp()
   dtostrf(Input_Temp,  4, 2, t3_buffer); 
   dtostrf(Output_Temp, 4, 2, t4_buffer);  
   
-  char topic[50];
-  
-  sprintf(topic, "%s/thermal-1/status", settings.mqttTopic);
-  mqttClient.publish(topic, t1_buffer);  
-  Blynk.virtualWrite(V20, t1_buffer);
-  
-  sprintf(topic, "%s/thermal-2/status", settings.mqttTopic);
-  mqttClient.publish(topic, t2_buffer);
-  Blynk.virtualWrite(V21, t2_buffer);
-  
-  sprintf(topic, "%s/thermal-3/status", settings.mqttTopic);
-  mqttClient.publish(topic, t3_buffer);
-  Blynk.virtualWrite(V22, t3_buffer);
-  
-  sprintf(topic, "%s/thermal-4/status", settings.mqttTopic);
-  mqttClient.publish(topic, t4_buffer);
-  Blynk.virtualWrite(V23, t4_buffer);
+#ifdef INCLUDE_MQTT_SUPPORT    
+	char topic[50];
+	sprintf(topic, "%s/thermal-1/status", settings.mqttTopic);
+	mqttClient.publish(topic, t1_buffer);
+
+	sprintf(topic, "%s/thermal-2/status", settings.mqttTopic);
+	mqttClient.publish(topic, t2_buffer);
+
+	sprintf(topic, "%s/thermal-3/status", settings.mqttTopic);
+	mqttClient.publish(topic, t3_buffer);
+
+	sprintf(topic, "%s/thermal-4/status", settings.mqttTopic);
+	mqttClient.publish(topic, t4_buffer);
+#endif
+
+#ifdef INCLUDE_BLYNK_SUPPORT	
+  	Blynk.virtualWrite(V20, t1_buffer);
+	Blynk.virtualWrite(V21, t2_buffer);
+	Blynk.virtualWrite(V22, t3_buffer);
+	Blynk.virtualWrite(V23, t4_buffer);
+#endif
 }
 
 #endif
@@ -294,6 +298,14 @@ void toggle(int channel) {
   int relayState = digitalRead(SONOFF_RELAY_PINS[channel]) == HIGH ? LOW : HIGH;
   setState(relayState, channel);
   digitalWrite(SONOFF_LED, !relayState);
+if (relayState == HIGH) { 
+	      Blynk.setProperty(channel * 5 - 3, "color", "#ccff33");
+}
+else {
+	      Blynk.setProperty(channel * 5 - 3, "color", "#23C48E");
+     }
+	
+//  Blynk.virtualWrite(channel * 5 + 4, state * 255);
 }
 
 void restart() {
@@ -461,7 +473,8 @@ void mqttCallback(const MQTT::Publish& pub) {
   }
 
 #endif
-}
+
+
 void setup()
 {
   Serial.begin(115200);
