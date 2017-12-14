@@ -12,11 +12,11 @@
    gpio 13 - green led - active low
    gpio 14 - pin 5 on header
    http://www.esp8266.com/wiki/lib/exe/fetch.php?cache=&media=esp8266-12_mod.png
- Распиновка на NodeMCU as Master (I2C) https://www.cnx-software.com/wp-content/uploads/2015/10/NodeMCU_v0.9_Pinout.png
+  Распиновка на NodeMCU as Master (I2C) https://www.cnx-software.com/wp-content/uploads/2015/10/NodeMCU_v0.9_Pinout.png
    ESP8266 GPIO AVAILIBLE: 0, 2, 4, 5, 12, 13, 14, 15
-  
-  D0    GPIO - 16 WAKE    
-  D1    GPIO - 5  ~ 
+
+  D0    GPIO - 16 WAKE
+  D1    GPIO - 5  ~
   D2    GPIO - 4  ~
   D3    GPIO - 0  FLASH
   D4    GPIO - 2  ~
@@ -26,7 +26,7 @@
   D8    GPIO - 15 ~
   D9    GPIO - 3  ~ (rx)
   D10   GPIO - 1  ~ (tx)
-*/ 
+*/
 
 #define   SONOFF_BUTTON             0         //0 - D3
 #define   SONOFF_LED                2         //2 - D4
@@ -90,33 +90,33 @@ WMSettings settings;
 Ticker ticker;
 
 #ifdef INCLUDE_RF_433_SUPPORT
- //   #include <livolo.h>
-    #include <RCSwitch.h>
-    RCSwitch mySwitch = RCSwitch();
- //   Livolo livolo(RF_PIN);
-    
-    //Socket 1416
-    char *socket1TriStateOn  = "FFFF0FFF0101";
-    char *socket1TriStateOff = "FFFF0FFF0110";
-    char *socket2TriStateOn  = "FFFF0FFF1001";
-    char *socket2TriStateOff = "FFFF0FFF1010";
-    char *socket3TriStateOn  = "FFFF0FF10001";
-    char *socket3TriStateOff = "FFFF0FF10010";
-    
-    //Socket 1401
-    char *socket11TriStateOn  = "0FFFFFFF0101";
-    char *socket11TriStateOff = "0FFFFFFF0110";
-    char *socket12TriStateOn  = "0FFFFFFF1001";
-    char *socket12TriStateOff = "0FFFFFFF1010";
-    char *socket13TriStateOn  = "0FFFFFF10001";
-    char *socket13TriStateOff = "0FFFFFF10010";
+//   #include <livolo.h>
+#include <RCSwitch.h>
+RCSwitch mySwitch = RCSwitch();
+//   Livolo livolo(RF_PIN);
 
-    void SendRF433(const char *ch) {
-      mySwitch.sendTriState(ch);
-      Serial.print("Send RF code: ");
-      Serial.println (*ch);
-    }
-    
+//Socket 1416
+char *socket1TriStateOn  = "FFFF0FFF0101";
+char *socket1TriStateOff = "FFFF0FFF0110";
+char *socket2TriStateOn  = "FFFF0FFF1001";
+char *socket2TriStateOff = "FFFF0FFF1010";
+char *socket3TriStateOn  = "FFFF0FF10001";
+char *socket3TriStateOff = "FFFF0FF10010";
+
+//Socket 1401
+char *socket11TriStateOn  = "0FFFFFFF0101";
+char *socket11TriStateOff = "0FFFFFFF0110";
+char *socket12TriStateOn  = "0FFFFFFF1001";
+char *socket12TriStateOff = "0FFFFFFF1010";
+char *socket13TriStateOn  = "0FFFFFF10001";
+char *socket13TriStateOff = "0FFFFFF10010";
+
+void SendRF433(const char *ch) {
+  mySwitch.sendTriState(ch);
+  Serial.print("Send RF code: ");
+  Serial.println (*ch);
+}
+
 #endif
 
 #ifdef INCLUDE_DS18B20_SUPPORT
@@ -127,12 +127,12 @@ Ticker ticker;
 OneWire oneWire(ONE_WIRE_BUS); // http://cdn.chantrell.net/blog/wp-content/uploads/2011/10/DS18B20_Connection.jpg
 DallasTemperature sensorsDS18B20(&oneWire);
 
-  float Out_Temp,Indoor_Temp,Input_Temp,Output_Temp;
+float Out_Temp, Indoor_Temp, Input_Temp, Output_Temp;
 
-  byte Indoor_t[8] = {0x28,0xFF,0x91,0xB0,0x87,0x16,0x03,0x1F};      // Температура внутри помещения
-  byte Out_t[8]    = {0x28,0xFF,0xA2,0xB5,0x90,0x16,0x04,0xE7};     // Температура на улице
-  byte Therm_1_t[8]= {0x28,0xFF,0x83,0x8F,0x00,0x15,0x02,0x21};    // Температура обратка
-  byte Therm_2_t[8]= {0x28,0xFF,0x0B,0x0A,0x62,0x15,0x01,0x84};   // Температура выход
+byte Indoor_t[8] = {0x28, 0xFF, 0x91, 0xB0, 0x87, 0x16, 0x03, 0x1F}; // Температура внутри помещения
+byte Out_t[8]    = {0x28, 0xFF, 0xA2, 0xB5, 0x90, 0x16, 0x04, 0xE7}; // Температура на улице
+byte Therm_1_t[8] = {0x28, 0xFF, 0x83, 0x8F, 0x00, 0x15, 0x02, 0x21}; // Температура обратка
+byte Therm_2_t[8] = {0x28, 0xFF, 0x0B, 0x0A, 0x62, 0x15, 0x01, 0x84}; // Температура выход
 
 
 void UpdateTemp()
@@ -149,14 +149,14 @@ void UpdateTemp()
   char t1_buffer[15];
   char t2_buffer[15];
   char t3_buffer[15];
-  char t4_buffer[15]; 
-   
-  dtostrf(Indoor_Temp, 4, 2, t1_buffer);  
-  dtostrf(Out_Temp,    4, 2, t2_buffer); 
-  dtostrf(Input_Temp,  4, 2, t3_buffer); 
-  dtostrf(Output_Temp, 4, 2, t4_buffer);  
-  
-#ifdef INCLUDE_MQTT_SUPPORT    
+  char t4_buffer[15];
+
+  dtostrf(Indoor_Temp, 4, 2, t1_buffer);
+  dtostrf(Out_Temp,    4, 2, t2_buffer);
+  dtostrf(Input_Temp,  4, 2, t3_buffer);
+  dtostrf(Output_Temp, 4, 2, t4_buffer);
+
+#ifdef INCLUDE_MQTT_SUPPORT
   char topic[50];
   sprintf(topic, "%s/thermal-1/status", settings.mqttTopic);
   mqttClient.publish(topic, t1_buffer);
@@ -171,7 +171,7 @@ void UpdateTemp()
   mqttClient.publish(topic, t4_buffer);
 #endif
 
-#ifdef INCLUDE_BLYNK_SUPPORT  
+#ifdef INCLUDE_BLYNK_SUPPORT
   Blynk.virtualWrite(V20, t1_buffer);
   Blynk.virtualWrite(V21, t2_buffer);
   Blynk.virtualWrite(V22, t3_buffer);
@@ -227,16 +227,16 @@ void updateBlynk(int channel) {
 #ifdef INCLUDE_BLYNK_SUPPORT
   int state = digitalRead(SONOFF_RELAY_PINS[channel]);
   Blynk.virtualWrite(channel * 5 + 4, state * 255);
-  if (state == HIGH) { 
-          Blynk.setProperty(channel * 5 - 4, "color", "#ff4f00");
+  int ch = channel + 1;
+  if (state == HIGH) {
+    Blynk.setProperty(ch + 1 * 5 - 4, "color", "#ff4f00");
   }
   else {
-          Blynk.setProperty(channel * 5 - 4, "color", "#23C48E");
-       }
+    Blynk.setProperty(ch + 1 * 5 - 4, "color", "#23C48E");
+  }
   yield();
   Blynk.virtualWrite(V28,  getCurrentDate() + String("  ") + getCurrentTime() );
   Blynk.setProperty(V28, "label", String("WIFI: ") + String(map(WiFi.RSSI(), -105, -40, 0, 100)) + String("% (") + WiFi.RSSI() + String("dB)") + String(" IP: ") + WiFi.localIP().toString());
-
 #endif
 }
 
@@ -304,14 +304,14 @@ void toggle(int channel) {
   int relayState = digitalRead(SONOFF_RELAY_PINS[channel]) == HIGH ? LOW : HIGH;
   setState(relayState, channel);
   digitalWrite(SONOFF_LED, !relayState);
-if (relayState == HIGH) { 
-        Blynk.setProperty(SONOFF_RELAY_PINS[channel], "color", "#ff4f00");
-}
-else {
-        Blynk.setProperty(SONOFF_RELAY_PINS[channel], "color", "#23C48E");
-     }
-  
-//  Blynk.virtualWrite(channel * 5 + 4, state * 255);
+  if (relayState == HIGH) {
+    Blynk.setProperty(SONOFF_RELAY_PINS[channel], "color", "#ff4f00");
+  }
+  else {
+    Blynk.setProperty(SONOFF_RELAY_PINS[channel], "color", "#23C48E");
+  }
+
+  //  Blynk.virtualWrite(channel * 5 + 4, state * 255);
 }
 
 void restart() {
@@ -369,20 +369,20 @@ BLYNK_WRITE_DEFAULT() {
         Serial.print(channel);
         break;
     }
-       Serial.print("Pin: ");        Serial.println(pin);
-       Serial.print("action: ");     Serial.println(action);
-       Serial.print("channel: ");    Serial.println(channel);
+    Serial.print("Pin: ");        Serial.println(pin);
+    Serial.print("action: ");     Serial.println(action);
+    Serial.print("channel: ");    Serial.println(channel);
   }
 }
 /*
-BLYNK_READ_DEFAULT() {
+  BLYNK_READ_DEFAULT() {
   // Generate random response
   int pin = request.pin;
   int channel = pin / 5;
   int action = pin % 5;
   Blynk.virtualWrite(pin, digitalRead(SONOFF_RELAY_PINS[channel]));
 
-}
+  }
 */
 //restart - button
 BLYNK_WRITE(30) {
@@ -409,13 +409,13 @@ BLYNK_WRITE(32) {
     mySwitch.sendTriState(socket3TriStateOn);
     Blynk.setProperty(V32, "color", "#ED9D00");
   }
-  else{
+  else {
     Serial.println("Light off");
     mySwitch.setPulseLength(179);
     mySwitch.sendTriState(socket3TriStateOff);
     Blynk.setProperty(V32, "color", "#23C48E");
-    
-    }
+
+  }
 }
 
 
@@ -474,7 +474,7 @@ void mqttCallback(const MQTT::Publish& pub) {
         const char *rf_code = payload.c_str();
         SendRF433(rf_code);
       }
-#endif     
+#endif
     }
   }
 
@@ -709,9 +709,9 @@ void loop()
           //updateMQTT(0);
 
           for (int ch = 0; ch < SONOFF_AVAILABLE_CHANNELS; ch++)  {
-              updateMQTT(ch);
+            updateMQTT(ch);
           }
-          
+
         } else {
           Serial.println("failed");
         }
@@ -750,5 +750,5 @@ void loop()
       break;
   }
 
- timer.run();
+  timer.run();
 }
