@@ -13,19 +13,19 @@
    gpio 14 - pin 5 on header
    http://www.esp8266.com/wiki/lib/exe/fetch.php?cache=&media=esp8266-12_mod.png
  Распиновка на NodeMCU as Master (I2C) https://www.cnx-software.com/wp-content/uploads/2015/10/NodeMCU_v0.9_Pinout.png
- 	ESP8266 GPIO AVAILIBLE: 0, 2, 4, 5, 12, 13, 14, 15
-	
-	D0		GPIO - 16	WAKE		
-	D1		GPIO - 5  ~	
-	D2		GPIO - 4  ~
-	D3		GPIO - 0	FLASH
-	D4		GPIO - 2  ~
-	D5		GPIO - 14 ~
-	D6		GPIO - 12 ~
-	D7		GPIO - 13 ~
-	D8		GPIO - 15 ~
-	D9		GPIO - 3  ~	(rx)
-	D10		GPIO - 1  ~	(tx)
+   ESP8266 GPIO AVAILIBLE: 0, 2, 4, 5, 12, 13, 14, 15
+  
+  D0    GPIO - 16 WAKE    
+  D1    GPIO - 5  ~ 
+  D2    GPIO - 4  ~
+  D3    GPIO - 0  FLASH
+  D4    GPIO - 2  ~
+  D5    GPIO - 14 ~
+  D6    GPIO - 12 ~
+  D7    GPIO - 13 ~
+  D8    GPIO - 15 ~
+  D9    GPIO - 3  ~ (rx)
+  D10   GPIO - 1  ~ (tx)
 */ 
 
 #define   SONOFF_BUTTON             0         //0 - D3
@@ -157,25 +157,25 @@ void UpdateTemp()
   dtostrf(Output_Temp, 4, 2, t4_buffer);  
   
 #ifdef INCLUDE_MQTT_SUPPORT    
-	char topic[50];
-	sprintf(topic, "%s/thermal-1/status", settings.mqttTopic);
-	mqttClient.publish(topic, t1_buffer);
+  char topic[50];
+  sprintf(topic, "%s/thermal-1/status", settings.mqttTopic);
+  mqttClient.publish(topic, t1_buffer);
 
-	sprintf(topic, "%s/thermal-2/status", settings.mqttTopic);
-	mqttClient.publish(topic, t2_buffer);
+  sprintf(topic, "%s/thermal-2/status", settings.mqttTopic);
+  mqttClient.publish(topic, t2_buffer);
 
-	sprintf(topic, "%s/thermal-3/status", settings.mqttTopic);
-	mqttClient.publish(topic, t3_buffer);
+  sprintf(topic, "%s/thermal-3/status", settings.mqttTopic);
+  mqttClient.publish(topic, t3_buffer);
 
-	sprintf(topic, "%s/thermal-4/status", settings.mqttTopic);
-	mqttClient.publish(topic, t4_buffer);
+  sprintf(topic, "%s/thermal-4/status", settings.mqttTopic);
+  mqttClient.publish(topic, t4_buffer);
 #endif
 
-#ifdef INCLUDE_BLYNK_SUPPORT	
-  	Blynk.virtualWrite(V20, t1_buffer);
-	Blynk.virtualWrite(V21, t2_buffer);
-	Blynk.virtualWrite(V22, t3_buffer);
-	Blynk.virtualWrite(V23, t4_buffer);
+#ifdef INCLUDE_BLYNK_SUPPORT  
+  Blynk.virtualWrite(V20, t1_buffer);
+  Blynk.virtualWrite(V21, t2_buffer);
+  Blynk.virtualWrite(V22, t3_buffer);
+  Blynk.virtualWrite(V23, t4_buffer);
 #endif
 }
 
@@ -227,8 +227,14 @@ void updateBlynk(int channel) {
 #ifdef INCLUDE_BLYNK_SUPPORT
   int state = digitalRead(SONOFF_RELAY_PINS[channel]);
   Blynk.virtualWrite(channel * 5 + 4, state * 255);
+  if (state == HIGH) { 
+          Blynk.setProperty(channel * 5 - 4, "color", "#ff4f00");
+  }
+  else {
+          Blynk.setProperty(channel * 5 - 4, "color", "#23C48E");
+       }
   yield();
-    Blynk.virtualWrite(V28,  getCurrentDate() + String("  ") + getCurrentTime() );
+  Blynk.virtualWrite(V28,  getCurrentDate() + String("  ") + getCurrentTime() );
   Blynk.setProperty(V28, "label", String("WIFI: ") + String(map(WiFi.RSSI(), -105, -40, 0, 100)) + String("% (") + WiFi.RSSI() + String("dB)") + String(" IP: ") + WiFi.localIP().toString());
 
 #endif
@@ -299,12 +305,12 @@ void toggle(int channel) {
   setState(relayState, channel);
   digitalWrite(SONOFF_LED, !relayState);
 if (relayState == HIGH) { 
-	      Blynk.setProperty(channel * 5 - 3, "color", "#ccff33");
+        Blynk.setProperty(SONOFF_RELAY_PINS[channel], "color", "#ff4f00");
 }
 else {
-	      Blynk.setProperty(channel * 5 - 3, "color", "#23C48E");
+        Blynk.setProperty(SONOFF_RELAY_PINS[channel], "color", "#23C48E");
      }
-	
+  
 //  Blynk.virtualWrite(channel * 5 + 4, state * 255);
 }
 
@@ -473,7 +479,7 @@ void mqttCallback(const MQTT::Publish& pub) {
   }
 
 #endif
-
+}
 
 void setup()
 {
