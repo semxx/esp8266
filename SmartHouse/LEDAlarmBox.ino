@@ -1,19 +1,50 @@
+/****************************************************** Версия от 01/04/2017 *******************************************************/
+// В версии от 14/09/2016 добавлены малые цифры и функция вывода их на матрицу
+//
+//
+//
 #include "LedControl.h"
 #include "OneWire.h"
 #include "DallasTemperature.h"
+#include <LiquidCrystal_I2C.h>
+LiquidCrystal_I2C lcd(0x3F, 16, 2);
+/****************************************************** Объявление констант ******************************************************/
 
+// Выход данных датчика температуры подключен к pin2 Arduino
 #define one_wire_bus 2
-#define Speaker        A0
+#define Speaker        A0         //  Д
 
+
+// Создаем экземпляр класса oneWire, передаевая ему параметр (номер пина Arduino)
 OneWire oneWire(one_wire_bus);                                                                                                                                                                                                   
+
+//
 DallasTemperature sensors(&oneWire);
 
-int dataPin = 12;
-int clkPin = 11;
-int csPin = 10;
+// Описание используемых ножек Arduino
+ int dataPin = 12;
+ int clkPin = 11;
+ int csPin = 10;
  
-int numDisplay = 3; 
-float temp; 
+ // Переменная numDisplay определяет число матричных 8*8 индикаторов в массиве
+ // Нумерация индикаторов начинается с 0
+ // Нумерация столбцов и строк индикатора также начинается с 0
+ //
+ int numDisplay = 3; 
+
+ // Переменная temp хранит считанную с датчика температуру
+float temp, temp1; 
+
+byte customChar[8] = {
+  0b11111,
+  0b11111,
+  0b11111,
+  0b00000,
+  0b00000,
+  0b00000,
+  0b00000,
+  0b00000
+};
 
 // Массив цифр 5*8
 byte digitM[][5] = {{B01111110,B10000001,B10000001,B10000001,B01111110},
@@ -65,16 +96,20 @@ byte minus[][3] = {{B00001000,B00001000,B00001000}};
 
 // Массив знака градусов и символа Цельсия (С)
 byte celsius[][7] = {{B00000011,B00000011,B00000000,B00011110,B00100001,B00100001,B00010010}};
-LedControl lc=LedControl(dataPin, clkPin, csPin, numDisplay);  // Создаем экземпляр класса LedControl
+              
+// Создаем экземпляр класса LedControl//
+//
+LedControl lc=LedControl(dataPin, clkPin, csPin, numDisplay);
 
 // Функция возвращает номер активного столбца в пределах индикатора
 // Вычисляем номер отображаемого (текущего) столбца в пределах индикатора.
 // Как пример:
 // Нам нужно вывести массив, начиная с 22-й позиции индикатора
 // 1-я позиция: 22-((22/8)*8 + 0) = 22
+//
 // 22 - (22/8)*8 = 22 - 2*8 = 6
 // Т.е. начинаем выводить, начиная с 6-й позиции
-
+//
 int fnNumIndicatorColumn(int startPosition, int arrayIndex)
 {
   if((startPosition - (startPosition/8)*8 + arrayIndex) > 7)
@@ -89,8 +124,8 @@ int fnCurentIndicator(int startPosition, int arrayIndex)
   return (startPosition + arrayIndex)/8;
 }
 
-
-void fnClearAllDevices(int numberDev)   // Функция стирает все индикатоы
+// Функция стирает все индикатоы
+void fnClearAllDevices(int numberDev)
 {
    for(int l=0; l<numDisplay; l++)
   {
@@ -100,7 +135,14 @@ void fnClearAllDevices(int numberDev)   // Функция стирает все 
 
 void setup()
 {
-// Устанавливаем значение яркости от 0 до 15
+   Serial.begin(9600);
+   lcd.init();   // initializing the LCD
+   lcd.backlight();
+   lcd.setCursor(0, 0); //инфо на LCD
+   lcd.createChar(0, customChar);
+//   lcd.print(F("Cold start..."));
+// Устанавливаем яркость индикаторов
+// Значение яркости от 0 до 15
     lc.setIntensity(0,7);
     lc.setIntensity(1,7);
     lc.setIntensity(2,7);
@@ -110,6 +152,8 @@ void setup()
     lc.shutdown(2,false);
     
     fnClearAllDevices(3);  
+
+    // Инициализация датчика температуры
     sensors.begin();
 }
 
@@ -158,8 +202,11 @@ void fnShowSmallDigit(int digit2Show, int startPosition)
   }  
 }
 
+/***************************************************** 14/02/2016 ***************************************************/
 // Функция выводит на матричный индикатор термометра целую часть данных температуры датчика.
 // Позиции вывода строго заданы
+//
+//
 void fnShowTwoBigDigit(double dsTemp)
 {
   int k;      // Целая часть значения температуры
@@ -179,12 +226,16 @@ void fnShowTwoBigDigit(double dsTemp)
 g = dsTemp*10;
 g = g - ((d10*10 + d1)*10);
 
+// "Рисуем" старшую цифру, затем младшую цифру
 fnShowBigDigit(d10,4);
 fnShowBigDigit(d1,10);
 fnShowDelimiter();
 fnShowSmallDigit(g,18);
 }
 
+/***************************************************** 08/02/2016 ***************************************************/
+// Функция вывода знака температуры Цельсия
+// 
 void fnShowCelsius()
 {
   for(int m=0; m<7; m++)
@@ -194,6 +245,9 @@ void fnShowCelsius()
   
 }
 
+/***************************************************** 09/02/2016 ***************************************************/
+// Функция вывода знака плюс
+// 
 void fnShowPlus()
 {
   for(int i=0;i<3;i++)
@@ -202,6 +256,9 @@ void fnShowPlus()
   }  
 }
 
+/***************************************************** 09/02/2016 ***************************************************/
+// Функция вывода знака минус
+// 
 void fnShowMinus()
 {
     for(int i=0;i<3;i++)
@@ -210,10 +267,15 @@ void fnShowMinus()
   }  
 }
 
+//
 void fnShowDelimiter()
 {
   lc.setRow(2,0,delimiter[0][0]);
   }
+
+/***************************************************** 09/02/2016 ***************************************************/
+// Основной цикл работы программы
+//
 
 void Buzzer(unsigned char delayms) 
 { 
@@ -226,13 +288,38 @@ void Buzzer(unsigned char delayms)
 void loop()
 {
   
+// Запрашиваем температуру с датчика  
   sensors.requestTemperatures();  
-  temp = (sensors.getTempCByIndex(0));
+  
+// Считываем температуру с датчика и передаем это значение функции
+  temp = sensors.getTempCByIndex(0);
+  temp1 = sensors.getTempCByIndex(1);
   fnShowTwoBigDigit(temp);
   fnShowPlus();
-  if (temp >= 26) {
-    Buzzer(30);  
+   lcd.setCursor(0, 1); //инфо на LCD
+   lcd.print(F("<:"));
+   lcd.print(temp);
+   lcd.setCursor(9, 1); //инфо на LCD
+   lcd.print(F(">:"));
+   lcd.print(F("70.42"));
+int scale;
+   lcd.setCursor(0, 0); //инфо на LCD
+   lcd.print(F("                "));    
+scale = map(temp,25,80,0,15);
+if (scale == 0) {
+   lcd.setCursor(0, 0); //инфо на LCD
+   lcd.print(F("Is off..."));  
   }
+Serial.println(scale);
+ for (int val = 0; val < scale; val++)  {
+   lcd.setCursor(val, 0); //инфо на LCD
+   lcd.write((uint8_t)0);
+ }
+    
+   //  fnShowCelsius();
+if (temp >= 75) {
+Buzzer(30);  
+}
 
 delay(500);
-}
+  }
