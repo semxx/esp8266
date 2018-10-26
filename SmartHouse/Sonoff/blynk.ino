@@ -28,10 +28,9 @@
   D10   GPIO - 1  ~ (tx)
 */
 
-#define   SONOFF_BUTTON             0         //0 - D3
+#define   SONOFF_BUTTON             0           //0 - D3
 #define   SONOFF_LED                13         //2 - D4
 #define   ONE_WIRE_BUS              4         //4 - D2  Линия датчиков DS18B20
-//#define   RF_PIN                    15         //15 - D8  RF433 Transmitter
 #define   SONOFF_AVAILABLE_CHANNELS 1
 
 const int SONOFF_RELAY_PINS[4] =    {12, 4, 4, 4}; 
@@ -42,29 +41,25 @@ const int SONOFF_RELAY_PINS[4] =    {12, 4, 4, 4};
 #define INCLUDE_BLYNK_SUPPORT
 #define INCLUDE_MQTT_SUPPORT
 #define INCLUDE_PZEM_SUPPORT
-//#define INCLUDE_RF_433_SUPPORT
 //#define INCLUDE_DS18B20_SUPPORT
 
-/********************************************
-   Should not need to edit below this line *
- * *****************************************/
 
 #include <ESP8266WiFi.h>
 #include "functions.h"
+
 #ifdef INCLUDE_BLYNK_SUPPORT
-//#define BLYNK_DEBUG
-//#define BLYNK_PRINT Serial    // Comment this out to disable prints and save space
 #include <BlynkSimpleEsp8266.h>
 #include <SimpleTimer.h>
 SimpleTimer timer;
 static bool BLYNK_ENABLED = true;
 #endif
 
-#ifdef INCLUDE_MQTT_SUPPORT
-#include <PubSubClient.h>        //https://github.com/Imroy/pubsubclient
 #include <EEPROM.h>
 #include <Ticker.h> //for LED status
 #include <ArduinoOTA.h>
+
+#ifdef INCLUDE_MQTT_SUPPORT
+#include <PubSubClient.h>        //https://github.com/Imroy/pubsubclient
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
 
 WiFiClient wclient;
@@ -106,38 +101,9 @@ typedef struct {
 WMSettings settings;
 Ticker ticker;
 
-#ifdef INCLUDE_RF_433_SUPPORT
-//   #include <livolo.h>
-#include <RCSwitch.h>
-RCSwitch mySwitch = RCSwitch();
-//   Livolo livolo(RF_PIN);
 
-//Socket 1416
-char *socket1TriStateOn  = "FFFF0FFF0101";
-char *socket1TriStateOff = "FFFF0FFF0110";
-char *socket2TriStateOn  = "FFFF0FFF1001";
-char *socket2TriStateOff = "FFFF0FFF1010";
-char *socket3TriStateOn  = "FFFF0FF10001";
-char *socket3TriStateOff = "FFFF0FF10010";
-
-//Socket 1401
-char *socket11TriStateOn  = "0FFFFFFF0101";
-char *socket11TriStateOff = "0FFFFFFF0110";
-char *socket12TriStateOn  = "0FFFFFFF1001";
-char *socket12TriStateOff = "0FFFFFFF1010";
-char *socket13TriStateOn  = "0FFFFFF10001";
-char *socket13TriStateOff = "0FFFFFF10010";
-
-void SendRF433(const char *ch) {
-  mySwitch.sendTriState(ch);
-  Serial.print("Send RF code: ");
-  // // Serial.println (*ch);
-}
-
-#endif
 
 #ifdef INCLUDE_DS18B20_SUPPORT
-
 #include <OneWire.h>                   //  Для DS18S20, DS18B20, DS1822 
 #include <DallasTemperature.h>         //  Для DS18S20, DS18B20, DS1822
 
@@ -316,8 +282,7 @@ void saveConfigCallback () {
 
 
 void toggle(int channel) {
-  // // Serial.println("toggle state");
-  // // Serial.println(digitalRead(SONOFF_RELAY_PINS[channel]));
+
   int relayState = digitalRead(SONOFF_RELAY_PINS[channel]) == HIGH ? LOW : HIGH;
   setState(relayState, channel);
   digitalWrite(SONOFF_LED, !relayState);
@@ -381,14 +346,14 @@ BLYNK_WRITE_DEFAULT() {
         toggle(channel);
         break;
       default:
-        Serial.print("unknown action");
-        Serial.print(action);
-        Serial.print(channel);
+//        Serial.print("unknown action");
+//        Serial.print(action);
+//        Serial.print(channel);
         break;
     }
-    Serial.print("Pin: ");        // // Serial.println(pin);
-    Serial.print("action: ");     // // Serial.println(action);
-    Serial.print("channel: ");    // // Serial.println(channel);
+//    Serial.print("Pin: ");        // // Serial.println(pin);
+//    Serial.print("action: ");     // // Serial.println(action);
+//    Serial.print("channel: ");    // // Serial.println(channel);
   }
 }
 /*
@@ -418,39 +383,37 @@ BLYNK_WRITE(31) {
 }
 
 
-#ifdef INCLUDE_RF_433_SUPPORT
+
 // ext house light  - button
 BLYNK_WRITE(32) {
   int a = param.asInt();
   if (a != 0) {
     // // Serial.println("Light on");
-    mySwitch.setPulseLength(179);
-    mySwitch.sendTriState(socket3TriStateOn);
+
     Blynk.setProperty(V32, "color", "#ED9D00");
   }
   else {
     // // Serial.println("Light off");
-    mySwitch.setPulseLength(179);
-    mySwitch.sendTriState(socket3TriStateOff);
+
     Blynk.setProperty(V32, "color", "#23C48E");
 
   }
 }
-#endif
+
 
 #endif
 
 #ifdef INCLUDE_MQTT_SUPPORT
 void mqttCallback(const MQTT::Publish& pub) {
-  Serial.print(pub.topic());
-  Serial.print(" => ");
+  // Serial.print(pub.topic());
+  // Serial.print(" => ");
   if (pub.has_stream()) {
     int BUFFER_SIZE = 100;
     uint8_t buf[BUFFER_SIZE];
     int read;
-    while (read = pub.payload_stream()->read(buf, BUFFER_SIZE)) {
-      Serial.write(buf, read);
-    }
+  //  while (read = pub.payload_stream()->read(buf, BUFFER_SIZE)) {
+  //    Serial.write(buf, read);
+  //  }
     pub.payload_stream()->stop();
     // // Serial.println("had buffer");
   } else {
@@ -486,6 +449,7 @@ void mqttCallback(const MQTT::Publish& pub) {
       if (payload == "") {
         updateMQTT(channel);
       }
+/*
 #ifdef INCLUDE_RF_433_SUPPORT
       if (payload.startsWith("0FFFF") || payload.startsWith("FFFF0") ) {
         Serial.print ("RF_CODE_DETECTED:");
@@ -494,11 +458,12 @@ void mqttCallback(const MQTT::Publish& pub) {
         SendRF433(rf_code);
       }
 #endif
+*/
     }
   }
 }
 #endif
-/*
+
 void updPZEM(){
   
       float v = pzem.voltage(ip);          
@@ -516,14 +481,14 @@ void updPZEM(){
 delay(1000);
 
             Blynk.virtualWrite(V41, voltage_blynk);
-            Blynk.virtualWrite(V42, current_blynk  );            
+            Blynk.virtualWrite(V42, current_blynk);            
             Blynk.virtualWrite(V43, power_blynk);
-            Blynk.virtualWrite(V44, energy_blynk  );
-            Blynk.virtualWrite(V45, lastMillis  );      
+            Blynk.virtualWrite(V44, energy_blynk);
+            Blynk.virtualWrite(V45, lastMillis);      
 
           
   }
-  */
+
 void setup()
 {
 #ifndef INCLUDE_PZEM_SUPPORT
@@ -621,10 +586,7 @@ void setup()
     strcpy(settings.mqttTopic, custom_mqtt_topic.getValue());
 #endif
 
-    // // Serial.println(settings.bootState);
-    // // Serial.println(settings.blynkToken);
-    // // Serial.println(settings.blynkServer);
-    // // Serial.println(settings.blynkPort);
+
 
     EEPROM.begin(512);
     EEPROM.put(0, settings);
@@ -652,37 +614,12 @@ void setup()
     mqttClient.set_server(settings.mqttHostname, atoi(settings.mqttPort));
   }
 #endif
-/*
-  //OTA
-  ArduinoOTA.onStart([]() {
-    // // Serial.println("Start OTA");
-  });
-  ArduinoOTA.onEnd([]() {
-    // // Serial.println("\nEnd");
-  });
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    // // Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-  });
-  ArduinoOTA.onError([](ota_error_t error) {
-    // // Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) // // Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) // // Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) // // Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) // // Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) // // Serial.println("End Failed");
-  });
-  ArduinoOTA.setHostname(hostname);
-  ArduinoOTA.begin();
-*/
-  //if you get here you have connected to the WiFi
-  // // Serial.println("connected...yeey :)");
+
   ticker.detach();
 
-  //setup button
   pinMode(SONOFF_BUTTON, INPUT);
   attachInterrupt(SONOFF_BUTTON, toggleState, CHANGE);
 
-  //initialize output pins array
   for (int ch = 0; ch < SONOFF_AVAILABLE_CHANNELS; ch++)  {
     pinMode(SONOFF_RELAY_PINS[ch], OUTPUT);
     digitalWrite(SONOFF_RELAY_PINS[ch], HIGH);
@@ -694,19 +631,11 @@ void setup()
     turnOff();
   }
 
-  //setup led
   if (!SONOFF_LED_RELAY_STATE) {
     digitalWrite(SONOFF_LED, LOW);
   }
 
-  // // Serial.println("done setup");
 
-#ifdef INCLUDE_RF_433_SUPPORT
-
-  mySwitch.enableTransmit(RF_PIN);
-  mySwitch.setPulseLength(179);
-
-#endif
 
 #ifdef INCLUDE_DS18B20_SUPPORT
   sensorsDS18B20.begin();
@@ -716,44 +645,17 @@ void setup()
 
 #ifdef INCLUDE_PZEM_SUPPORT
   pzem.setAddress(ip);
-//  timer.setInterval(100000L, updPZEM);
+  timer.setInterval(100000L, updPZEM);
 #endif
-//updPZEM();
+updPZEM();
 }
 
 
 void loop()
 {
-    float v = pzem.voltage(ip);          
-   if(v >= 0.0){   voltage_blynk =v; } //V
-  
-    float i = pzem.current(ip);
-    if(i >= 0.0){ current_blynk=i;    }  //A                                                                                                                      
-    
-    float p = pzem.power(ip);
-    if(p >= 0.0){power_blynk=p;       } //kW
-    
-    float e = pzem.energy(ip);          
-    if(e >= 0.0){  energy_blynk =e;  } ///kWh
-
-delay(1000);
-
-      //Publish data every 10 seconds (10000 milliseconds). Change this value to publish at a different interval.
-          if (millis() - lastMillis > 10000) {
-            lastMillis = millis();
-            
-            Blynk.virtualWrite(V41, voltage_blynk);
-            Blynk.virtualWrite(V42, current_blynk  );            
-            Blynk.virtualWrite(V43, power_blynk);
-            Blynk.virtualWrite(V44, energy_blynk  );
-            Blynk.virtualWrite(V45, lastMillis  );      
-
-          }  
-  //ota loop
-  ArduinoOTA.handle();
+   
 
 #ifdef INCLUDE_BLYNK_SUPPORT
-  //blynk connect and run loop
   if (BLYNK_ENABLED) {
     Blynk.run();
   }
@@ -766,8 +668,6 @@ delay(1000);
     if (!mqttClient.connected()) {
       if (lastMQTTConnectionAttempt == 0 || millis() > lastMQTTConnectionAttempt + 3 * 60 * 1000) {
         lastMQTTConnectionAttempt = millis();
-        // // Serial.println(millis());
-        // // Serial.println("Trying to connect to mqtt");
         if (mqttClient.connect(settings.mqttClientID)) {
           mqttClient.set_callback(mqttCallback);
           char topic[50];
@@ -779,15 +679,13 @@ delay(1000);
           sprintf(topic, "%s/rf", HOSTNAME);
           mqttClient.subscribe(topic);
 
-          //TODO multiple relays
-          //updateMQTT(0);
 
           for (int ch = 0; ch < SONOFF_AVAILABLE_CHANNELS; ch++)  {
             updateMQTT(ch);
           }
 
         } else {
-          // // Serial.println("failed");
+
         }
       }
     } else {
@@ -796,8 +694,6 @@ delay(1000);
   }
 #endif
 
-  //delay(200);
-  //// // Serial.println(digitalRead(SONOFF_BUTTON));
   switch (cmd) {
     case CMD_WAIT:
       break;
@@ -807,13 +703,10 @@ delay(1000);
         if (buttonState == LOW && currentState == HIGH) {
           long duration = millis() - startPress;
           if (duration < 1000) {
-            // // Serial.println("short press - toggle relay");
             toggle(0);
           } else if (duration < 5000) {
-            // // Serial.println("medium press - reset");
             restart();
           } else if (duration < 60000) {
-            // // Serial.println("long press - reset settings");
             reset();
           }
         } else if (buttonState == HIGH && currentState == LOW) {
