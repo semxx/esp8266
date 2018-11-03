@@ -51,4 +51,40 @@ String formatTime(long milliSeconds) {
   returned += secs_o + secs + String("s");
   return returned;
 }
+float a = 17.271;
+float b = 237.7;
+float calculateDewPointGamma(float temperature, float humidity)
+{
+  float gamma = ((a * temperature) / (b + temperature)) + log(humidity / 100);
+
+  return gamma;
+}
+
+
+float calculateDewPoint(float temperature, float humidity)
+{
+  float gammavalue = calculateDewPointGamma(temperature, humidity);
+ 
+  float dewpoint = (b * gammavalue) / (a - gammavalue);
+
+  return dewpoint;
+ 
+}
+
+
+
+float calculateHumidexE(float dewpoint)
+{
+  float e = 5417.7530 * ((1/273.16) - (1 / (273.16 + dewpoint)));
+
+  return e;
+}
+
+
+float calculateHumidex(float temperature, float dewpoint)
+{
+  float humidex = temperature + 0.5555 * ( 6.11 * exp(calculateHumidexE(dewpoint)) - 10);
+
+  return humidex;
+}
 
