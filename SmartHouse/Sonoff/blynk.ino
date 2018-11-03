@@ -56,7 +56,7 @@ static bool BLYNK_ENABLED = true;
 
 #include <EEPROM.h>
 #include <Ticker.h> //for LED status
-#include <ArduinoOTA.h>
+//#include <ArduinoOTA.h>
 
 #ifdef INCLUDE_MQTT_SUPPORT
 #include <PubSubClient.h>        //https://github.com/Imroy/pubsubclient
@@ -69,7 +69,7 @@ int         lastMQTTConnectionAttempt = 0;
 #endif
 
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
-#include <ArduinoOTA.h>
+//#include <ArduinoOTA.h>
 #include <Ticker.h> //for LED status
 #include <EEPROM.h>
 
@@ -84,6 +84,16 @@ float power_blynk=0;
 float energy_blynk=0;
 unsigned long lastMillis = 0;
 #endif
+
+#include <Wire.h>
+#include <HTU21D.h>
+
+float temperature;
+float humidity;
+float dewpoint;
+float humidex;
+ 
+HTU21D myHTU21D;
 
 #define EEPROM_SALT 12667
 typedef struct {
@@ -478,8 +488,6 @@ void updPZEM(){
     float e = pzem.energy(ip);          
     if(e >= 0.0){  energy_blynk =e;  } ///kWh
 
-delay(1000);
-
             Blynk.virtualWrite(V41, voltage_blynk);
             Blynk.virtualWrite(V42, current_blynk);            
             Blynk.virtualWrite(V43, power_blynk);
@@ -487,6 +495,21 @@ delay(1000);
             Blynk.virtualWrite(V45, lastMillis);      
 
           
+  }
+
+void GetHTU21(){
+  
+    temperature = myHTU21D.readTemperature();
+    humidity = myHTU21D.readCompensatedHumidity();
+    dewpoint = calculateDewPoint(temperature, humidity);
+    humidex = calculateHumidex(temperature, dewpoint);
+  //  calculateHumidexDiscomfortLevel(humidex);
+            Blynk.virtualWrite(V36, temperature);
+            Blynk.virtualWrite(V37, humidity);            
+            Blynk.virtualWrite(V38, dewpoint);
+            Blynk.virtualWrite(V39, humidex);
+            Blynk.virtualWrite(V40, lastMillis);      
+
   }
 
 void setup()
@@ -645,12 +668,14 @@ void setup()
 
 #ifdef INCLUDE_PZEM_SUPPORT
   pzem.setAddress(ip);
-  timer.setInterval(100000L, updPZEM);
+  timer.setInterval(10000L, updPZEM);
 #endif
 updPZEM();
+
+myHTU21D.begin(4, 5);
+timer.setInterval(10000L, GetHTU21);
+
 }
-
-
 void loop()
 {
    
