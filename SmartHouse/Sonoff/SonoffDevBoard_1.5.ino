@@ -27,7 +27,8 @@
   D9    GPIO - 3  ~ (rx)
   D10   GPIO - 1  ~ (tx)
 */
-
+#define SDA            D6         //  SDA   GPIO12
+#define SCL            D5         //  SCL   GPIO14
 #define   SONOFF_BUTTON             0         //0 - D3
 #define   SONOFF_LED                2         //2 - D4
 #define   ONE_WIRE_BUS              4         //4 - D2  Линия датчиков DS18B20
@@ -48,11 +49,11 @@ const int SONOFF_RELAY_PINS[4] =    {12, 13, 14, 5}; //  D6 D7 D5 D1
    Should not need to edit below this line *
  * *****************************************/
 
-#include <ESP8266WiFi.h>
 #include "functions.h"
 #ifdef INCLUDE_BLYNK_SUPPORT
 //#define BLYNK_DEBUG
 #define BLYNK_PRINT Serial    // Comment this out to disable prints and save space
+#include <ESP8266WiFi.h>
 #include <BlynkSimpleEsp8266.h>
 #include <SimpleTimer.h>
 SimpleTimer timer;
@@ -61,7 +62,7 @@ static bool BLYNK_ENABLED = true;
 
 #ifdef INCLUDE_MQTT_SUPPORT
 #include <PubSubClient.h>        //https://github.com/Imroy/pubsubclient
-
+#include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
 WiFiClient wclient;
 PubSubClient mqttClient(wclient);
 static bool MQTT_ENABLED              = true;
@@ -72,6 +73,18 @@ int         lastMQTTConnectionAttempt = 0;
 #include <ArduinoOTA.h>
 #include <Ticker.h> //for LED status
 #include <EEPROM.h>
+
+#include <Wire.h>
+//#include <HTU21D.h>
+/*
+HTU21D(resolution)
+resolution:
+HTU21D_RES_RH12_TEMP14 - RH: 12Bit, Temperature: 14Bit, by default
+HTU21D_RES_RH8_TEMP12  - RH: 8Bit,  Temperature: 12Bit
+HTU21D_RES_RH10_TEMP13 - RH: 10Bit, Temperature: 13Bit
+HTU21D_RES_RH11_TEMP11 - RH: 11Bit, Temperature: 11Bit
+*/
+//HTU21D myHTU21D(HTU21D_RES_RH12_TEMP14);
 
 #define EEPROM_SALT 12667
 typedef struct {
@@ -127,7 +140,7 @@ void SendRF433(const char *ch) {
 OneWire oneWire(ONE_WIRE_BUS); // http://cdn.chantrell.net/blog/wp-content/uploads/2011/10/DS18B20_Connection.jpg
 DallasTemperature sensorsDS18B20(&oneWire);
 
-float Out_Temp, Indoor_Temp, Input_Temp, Output_Temp;
+float Out_Temp, Indoor_Temp, Input_Temp, Output_Temp, Hym;
 
 byte Indoor_t[8] = {0x28, 0xFF, 0x91, 0xB0, 0x87, 0x16, 0x03, 0x1F}; // Температура внутри помещения
 byte Out_t[8]    = {0x28, 0xFF, 0xA2, 0xB5, 0x90, 0x16, 0x04, 0xE7}; // Температура на улице
@@ -145,17 +158,20 @@ void UpdateTemp()
   Out_Temp = sensorsDS18B20.getTempC(Out_t);
   Input_Temp = sensorsDS18B20.getTempC(Therm_1_t);
   Output_Temp = sensorsDS18B20.getTempC(Therm_2_t);
-
+//  Hym = myHTU21D.readHumidity();
+  
   char t1_buffer[15];
   char t2_buffer[15];
   char t3_buffer[15];
   char t4_buffer[15];
-
+  char h1_buffer[15];
+  
   dtostrf(Indoor_Temp, 4, 2, t1_buffer);
   dtostrf(Out_Temp,    4, 2, t2_buffer);
   dtostrf(Input_Temp,  4, 2, t3_buffer);
   dtostrf(Output_Temp, 4, 2, t4_buffer);
-
+//  dtostrf(Hym, 4, 2, h1_buffer);
+  
 #ifdef INCLUDE_MQTT_SUPPORT
   char topic[50];
   sprintf(topic, "%s/thermal-1/status", settings.mqttTopic);
@@ -176,6 +192,7 @@ void UpdateTemp()
   Blynk.virtualWrite(V21, t2_buffer);
   Blynk.virtualWrite(V22, t3_buffer);
   Blynk.virtualWrite(V23, t4_buffer);
+//  Blynk.virtualWrite(V25, h1_buffer);
 #endif
 }
 
@@ -418,7 +435,55 @@ BLYNK_WRITE(32) {
   }
 }
 
+// ext house light  - button
+BLYNK_WRITE(33) {
+  int a = param.asInt();
+  if (a != 0) {
+    Serial.println("Light on");
+    mySwitch.setPulseLength(179);
+    mySwitch.sendTriState(socket1TriStateOn);
+    Blynk.setProperty(V33, "color", "#ED9D00");
+  }
+  else {
+    Serial.println("Light off");
+    mySwitch.setPulseLength(179);
+    mySwitch.sendTriState(socket1TriStateOff);
+    Blynk.setProperty(V33, "color", "#23C48E");
 
+  }
+}
+
+
+BLYNK_WRITE(34) {
+  String stateString = "auto";
+  int a = param.asInt();
+  if (a != 0) {
+  char topic[50] = "/broadlink/ac_heat";
+  mqttClient.publish(topic, stateString);
+  yield();  }
+  else {  
+ 
+  char topic[50] = "/broadlink/ac_off";
+  mqttClient.publish(topic, stateString);
+  yield();  
+  
+  }
+}
+BLYNK_WRITE(35) {
+  String stateString = "auto";
+  int a = param.asInt();
+  if (a != 0) {
+  char topic[50] = "/broadlink/ac1_heat";
+  mqttClient.publish(topic, stateString);
+  yield();  }
+  else {  
+ 
+  char topic[50] = "/broadlink/ac1_off";
+  mqttClient.publish(topic, stateString);
+  yield();  
+  
+  }
+}
 #endif
 
 #ifdef INCLUDE_MQTT_SUPPORT
@@ -668,6 +733,14 @@ void setup()
   sensorsDS18B20.requestTemperatures();
   timer.setInterval(300000L, UpdateTemp);
 #endif
+  
+/*
+  while (myHTU21D.begin() != true)
+  {
+    Serial.println(F("Si7021 sensor is faild or not connected"));
+    delay(5000);
+  }
+*/
 
 }
 
