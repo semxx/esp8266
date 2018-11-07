@@ -458,12 +458,12 @@ BLYNK_WRITE(34) {
   String stateString = "auto";
   int a = param.asInt();
   if (a != 0) {
-  char topic[50] = "/broadlink/ac_heat";
+  char topic[50] = "/broadlink/ac-1/ac_heat";
   mqttClient.publish(topic, stateString);
   yield();  }
   else {  
  
-  char topic[50] = "/broadlink/ac_off";
+  char topic[50] = "/broadlink/ac-1/ac_off";
   mqttClient.publish(topic, stateString);
   yield();  
   
@@ -473,12 +473,12 @@ BLYNK_WRITE(35) {
   String stateString = "auto";
   int a = param.asInt();
   if (a != 0) {
-  char topic[50] = "/broadlink/ac1_heat";
+  char topic[50] = "/broadlink/ac-2/ac_heat";
   mqttClient.publish(topic, stateString);
   yield();  }
   else {  
  
-  char topic[50] = "/broadlink/ac1_off";
+  char topic[50] = "/broadlink/ac-2/ac_off";
   mqttClient.publish(topic, stateString);
   yield();  
   
