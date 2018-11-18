@@ -69,9 +69,6 @@
 #define WaterControl   14         //  A0 Датчик протечки воды
 #define Reset_GSM_PIN  15         //  A1 Рестарт GSM-модуля если нет ответа по команде AT
 
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
-
    EXPAND io(0x01);               //initialize an instance of the class with address 0x01
 
 /*
@@ -120,10 +117,13 @@ char   temp_msg[160];              // Переменная , в нее пише�
 
 byte MenuTimeoutTimer;
 byte num_Screen = 1;               // текущий экран
-byte max_Screen = 6;               // всего экранов
+byte max_Screen = 8;               // всего экранов
 byte batt = 0;                     // Переменная хранит заряд батареи
 byte sgsm = 0;                     // Переменная хранит уровень сигнала сети
-
+float therm1;
+float therm2;
+float therm3;
+float therm4;
 #define test
 
 
@@ -163,7 +163,7 @@ int  lastLSB = 0;
 long lastencoderValue = 0;
 unsigned long LAST_DEBOUNCE_TIME = 0;
 unsigned long DEBOUNCE_DELAY = 200;
-
+unsigned long ROTATE_DELAY = 50; 
 //  Ниже не значения, а адреса ячеек ПЗУ
 int Addr_Auto_Temp = 0;   // Адрес в ПЗУ для Auto_Temp
 int Addr_Lcd_Tot =  1;    // Адрес в ПЗУ для ориентация экрана 0-нормальная 1-перевернутая
@@ -186,7 +186,7 @@ unsigned long EnergySaveMode = 0;           // Время экономить ж�
 
 SoftwareSerial gprsSerial(SW_RX, SW_TX);    // установка контактов 1 и 3 для программного порта
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_SSD1306 display(128, 64, &Wire, OLED_RESET);
 SimpleTimer timer;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensorsDS18B20(&oneWire);
@@ -249,7 +249,7 @@ void setup()
 //  fillHistory();
 //  EEPROM.write(addr_Auto_Temp, 24);
 //  clock.setDateTime(__DATE__, __TIME__);                  // Устанавливаем время на часах, основываясь на времени компиляции скетча
-//  clock.setDateTime(2018, 11, 15, 22, 12, 0);              // Установка времени вручную (Год, Месяц, День, Час, Минута, Секунда)
+//  clock.setDateTime(2018, 11, 18, 23, 01, 0);              // Установка времени вручную (Год, Месяц, День, Час, Минута, Секунда)
 //  setAlarm1(Дата или день, Час, Минута, Секунда, Режим)
 //  clock.setAlarm1(0, 0, 0, 10, DS3231_MATCH_S);           // Устанавливаем первый будильник на срабатывание в 10 сек. каждой минуты. Режим DS3231_MATCH_S сообщает о том, что ориентироваться надо на секунды.
 
@@ -340,16 +340,23 @@ void handleInterrupt() {
   int sum  = (lastEncoded << 2) | encoded;  //adding it to the previous encoded value
         if(sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) 
         { 
+          if ((millis() - LAST_DEBOUNCE_TIME) > ROTATE_DELAY) {
           encoderValue --;
+          Serial.println("Val--"); 
+          }
+          LAST_DEBOUNCE_TIME = millis(); 
           encoderR = true;
           MenuTimeoutTimer = 10;
-          Serial.println("Val--");   
+  
         }
         if(sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) {
+          if ((millis() - LAST_DEBOUNCE_TIME) > ROTATE_DELAY) {
           encoderValue ++;
+          Serial.println("Val++");
+          }
+          LAST_DEBOUNCE_TIME = millis();
           encoderL = true;
-          MenuTimeoutTimer = 10;
-         Serial.println("Val++"); 
+          MenuTimeoutTimer = 10; 
         }
       
         lastEncoded = encoded;
@@ -418,8 +425,11 @@ if (Serial.available()){           // Ожидаем команды по Serial.
 
   if (currentTime > Next_Update_Temp)  {        // время обновить температуру
     Blynk.virtualWrite(V5, encoderValue );
-    Blynk.virtualWrite(V6, Floor_1_Temp);
-    Blynk.virtualWrite(V7, Floor_2_Temp);
+    Blynk.virtualWrite(V6, therm1);
+    Blynk.virtualWrite(V7, therm2);
+    Blynk.virtualWrite(V8, therm3);
+    Blynk.virtualWrite(V9, therm4);
+    Blynk.virtualWrite(V10, Out_Temp);    
     UpdateTemp();
     //Serial.println(WIFI_getRSSIasQuality(WiFi.RSSI()));
     CheckConnection();
@@ -586,11 +596,16 @@ void UpdateTemp()
 {
   sensorsDS18B20.requestTemperatures();
    
-  Out_Temp = sensorsDS18B20.getTempC(Out_Therm);
-  Main_Temp = sensorsDS18B20.getTempC(Board_Therm);
-  Floor_1_Temp = sensorsDS18B20.getTempC(Therm_1);
-  Floor_2_Temp = sensorsDS18B20.getTempC(Therm_2);
+  therm1 = sensorsDS18B20.getTempC(Out_Therm);
+  therm2 = sensorsDS18B20.getTempC(Board_Therm);
+  therm3 = sensorsDS18B20.getTempC(Therm_1);
+  therm4 = sensorsDS18B20.getTempC(Therm_2);
 
+  Out_Temp     = round(therm1);
+  Main_Temp    = round(therm2);
+  Floor_1_Temp = round(therm3);
+  Floor_2_Temp = round(therm4);
+  Serial.println(clock.readTemperature());
   // если датчик не подключен выдает -127 на экране не красиво, поставим -88
   if (Floor_1_Temp == -127) {
     Floor_1_Temp = 00;
