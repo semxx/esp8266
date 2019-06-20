@@ -31,15 +31,16 @@
 #define   SONOFF_BUTTON             0           //0 - D3
 #define   SONOFF_LED                13         //2 - D4
 #define   ONE_WIRE_BUS              4         //4 - D2  Линия датчиков DS18B20
-#define   SONOFF_AVAILABLE_CHANNELS 4
+#define   SONOFF_AVAILABLE_CHANNELS 5
 
-const int SONOFF_RELAY_PINS[4] =    {12, 5, 4, 14}; 
+const int SONOFF_RELAY_PINS[5] =    {12, 5, 4, 14, 1}; 
 
 #define SONOFF_LED_RELAY_STATE      false
 #define HOSTNAME "watering"
 
 #define INCLUDE_BLYNK_SUPPORT
 #define INCLUDE_MQTT_SUPPORT
+#define SERIAL_PORT
 //#define INCLUDE_PZEM_SUPPORT
 //#define INCLUDE_HTU21D_SUPPORT
 //#define INCLUDE_DS18B20_SUPPORT
@@ -168,10 +169,10 @@ void UpdateTemp()
 #endif
 
 #ifdef INCLUDE_BLYNK_SUPPORT
-  Blynk.virtualWrite(V20, t1_buffer);
-  Blynk.virtualWrite(V21, t2_buffer);
-  Blynk.virtualWrite(V22, t3_buffer);
-  Blynk.virtualWrite(V23, t4_buffer);
+  Blynk.virtualWrite(V50, t1_buffer);
+  Blynk.virtualWrite(V51, t2_buffer);
+  Blynk.virtualWrite(V52, t3_buffer);
+  Blynk.virtualWrite(V53, t4_buffer);
 #endif
 }
 
@@ -224,6 +225,9 @@ void updateBlynk(int channel) {
   int state = digitalRead(SONOFF_RELAY_PINS[channel]);
   Blynk.virtualWrite(channel * 5 + 4, state * 255);
   int v_channel = channel + 1;
+  int v_ch = (v_channel * 5 - 4);
+  Serial.print("v_ch=");
+  Serial.println(v_ch);
   if (state == HIGH) {
     Blynk.setProperty(v_channel * 5 - 4, "color", "#ff4f00");
   }
@@ -364,9 +368,9 @@ BLYNK_WRITE_DEFAULT() {
 //        Serial.print(channel);
         break;
     }
-//    Serial.print("Pin: ");        // // Serial.println(pin);
-//    Serial.print("action: ");     // // Serial.println(action);
-//    Serial.print("channel: ");    // // Serial.println(channel);
+    Serial.print("Pin: ");        // // Serial.println(pin);
+    Serial.print("action: ");     // // Serial.println(action);
+    Serial.print("channel: ");    // // Serial.println(channel);
   }
 }
 /*
@@ -519,6 +523,8 @@ void GetHTU21(){
 #endif
 void setup()
 {
+
+Serial.begin(115200);
 #ifndef INCLUDE_PZEM_SUPPORT
 //  Serial.begin(115200);
 #endif  
